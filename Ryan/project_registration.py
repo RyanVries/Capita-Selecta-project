@@ -134,6 +134,13 @@ def register_patients(fixed_subject,moving_subject,result_dir_start):
     #visualization of the results
     visualize_patient(fixed_img,fixed_seg_img, moving_img, moving_seg_img, t_img2, t_seg_img2)
     
+    for i in range(86):
+        fig, ax = plt.subplots(1, 2, figsize=(10, 15))
+        ax[0].imshow(moving_seg_img[i,:,:], cmap='gray')
+        ax[0].set_title('Ground Truth')
+        ax[1].imshow(t_seg_img2[i,:,:], cmap='gray')
+        ax[1].set_title('Estimation')
+        plt.show()
     '''
     #make video of images
     out = cv2.VideoWriter('project.avi',cv2.VideoWriter_fourcc('M','J','P','G'), float(10), (np.shape(t_img2)[2],np.shape(t_img2)[1]), isColor=True)
