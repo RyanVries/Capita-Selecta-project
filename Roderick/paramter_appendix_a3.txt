@@ -1,0 +1,96 @@
+
+//ImageTypes
+(FixedInternalImagePixelType  "float") 
+(MovingInternalImagePixelType  "float") 
+(UseDirectionCosines "true")
+(FixedImageDimension 3)
+(MovingImageDimension 3)
+
+//Components
+(Registration  "MultiResolutionRegistration") 
+(FixedImagePyramid  "FixedRecursiveImagePyramid") 
+(MovingImagePyramid  "MovingRecursiveImagePyramid") 
+(Interpolator  "BSplineInterpolator")
+(Metric  "AdvancedMattesMutualInformation") 
+(Optimizer  "AdaptiveStochasticGradientDescent") 
+//optimizer is anders 
+(ResampleInterpolator  "FinalBSplineInterpolator") 
+(Resampler  "DefaultResampler")
+(Transform  "BSplineTransform")
+
+//  **********  Pyramid
+//  Total  number  of  resolutions 
+(NumberOfResolutions  6)
+//met 4 --> 0.802
+// na 5 --> 0.87
+
+//  **********  Transform
+//(CenterOfRotation  128  128)  center  by  default 
+(AutomaticTransformInitialization  "true") 
+(AutomaticScalesEstimation  "true") 
+(HowToCombineTransforms  "Compose")
+
+
+//  **********  Optimizer
+//  Maximum  number  of  iterations  in  each  resolution  level: 
+// oorspronkelijk gegeven door: (MaximumNumberOfIterations  300  300  600)
+(MaximumNumberOfIterations 2000 ) 
+
+(AutomaticParameterEstimation  "true") 
+(UseAdaptiveStepSizes  "true")
+
+
+//  **********  Metric
+//Number  of  grey  level  bins  in  each  resolution  level: 
+//(FixedKernelBSplineOrder  1)
+//(MovingKernelBSplineOrder  3)
+(NumberOfHistogramBins 32 )
+//8 presteert aanzienlijk slechter
+(FixedLimitRangeRatio 0.0)
+(MovingLimitRangeRatio 0.0)
+(FixedKernelBSplineOrder 3)
+(MovingKernelBSplineOrder 3)
+
+
+//  **********  Several
+(WriteTransformParametersEachIteration  "false") 
+(WriteTransformParametersEachResolution  "false") 
+//2 hieronder uit bron aaron 
+(WriteResultImage "false")
+(WriteResultImageAfterEachResolution "false") 
+(ShowExactMetricValue  "false")
+(ErodeMask  "false")
+//erodemask was orgineel true, maar false als randen van invloed zijn 
+//na testen --> geen effect ondervonden 
+
+
+//  **********  ImageSampler
+//  Number  of  spatial  samples  used  to  compute  the
+//  mutual  information  in  each  resolution  level: 
+(ImageSampler  "RandomCoordinate") 
+(NumberOfSpatialSamples  2048) 
+(NewSamplesEveryIteration  "true")
+// toegevoegd:
+(FixedImageBSplineInterpolationOrder 1)
+// had ik eerst op 1 staan 
+(UseRandomSampleRegion "true")
+(SampleRegionSize 50.0)
+(CheckNumberOfSamples "false")
+
+
+//  **********  Interpolator  and  Resampler
+//Order  of  B-Spline  interpolation  used  in  each  resolution  level: 
+(BSplineInterpolationOrder 3)
+
+//Order  of  B-Spline  interpolation  used  for  applying  the  final  deformation: 
+(FinalBSplineInterpolationOrder  1)
+
+//Default  pixel  value  for  pixels  that  come  from  outside  the  picture:
+(DefaultPixelValue  0)
+
+// ********** vanuit bron aaron 
+(FinalGridSpacingInPhysicalUnits 6.0)
+(GridSpacingSchedule 32.0 16.0 8.0 4.0 2.0 1.0)
+//hier een eerste term aan toegevoegd 
+//daarna weer een nieuwe eerste term
+
