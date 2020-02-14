@@ -9,6 +9,7 @@ import SimpleITK as sitk
 import sys
 import cv2
 from mpl_toolkits.mplot3d import Axes3D
+import pandas as pd
 
 # IMPORTANT: these paths may differ on your system, depending on where
 # Elastix has been installed. Please set accordingly.
@@ -127,21 +128,25 @@ def register_patients(fixed_subject,moving_subject,result_dir_start):
 
     t_img2 = sitk.GetArrayFromImage(sitk.ReadImage(t_img_path2))
     t_seg_img2 = sitk.GetArrayFromImage(sitk.ReadImage(t_seg_path2))
-
-    dice=( (2.0*np.sum(np.logical_and(t_seg_img2,moving_seg_img))) / (np.sum(t_seg_img2)+np.sum(moving_seg_img)) )
-    print('Dice similarity score is {}'.format(dice))
+ 
+    dice=dice_overlap(t_seg_img2,fixed_seg_img)
+    print('Dice similarity score with ground truth is {}'.format(dice))
     
     #visualization of the results
     visualize_patient(fixed_img,fixed_seg_img, moving_img, moving_seg_img, t_img2, t_seg_img2)
     
-    for i in range(86):
-        fig, ax = plt.subplots(1, 2, figsize=(10, 15))
+    '''
+    for i in range(np.shape(t_seg_img2)[0]):
+        fig, ax = plt.subplots(1, 3, figsize=(10, 15))
         ax[0].imshow(moving_seg_img[i,:,:], cmap='gray')
         ax[0].set_title('Ground Truth')
         ax[1].imshow(t_seg_img2[i,:,:], cmap='gray')
         ax[1].set_title('Estimation')
+        ax[2].imshow(fixed_seg_img[i,:,:], cmap='gray')
+        ax[2].set_title('Fixed Atlas')
+        
         plt.show()
-    '''
+    
     #make video of images
     out = cv2.VideoWriter('project.avi',cv2.VideoWriter_fourcc('M','J','P','G'), float(10), (np.shape(t_img2)[2],np.shape(t_img2)[1]), isColor=True)
  
@@ -168,6 +173,11 @@ def register_patients(fixed_subject,moving_subject,result_dir_start):
     #ax[3].set_title('Jacobian\ndeterminant')
 
     return t_seg_img2, dice
+
+
+def dice_overlap(im1,im2):
+    dice=( (2.0*np.sum(np.logical_and(im1,im2))) / (np.sum(im1)+np.sum(im2)) )
+    return dice
 
 def visualize_patient(fixed_img, fixed_seg_img, moving_img, moving_seg_img, t_img, t_seg_img):
     slice_id=50
@@ -209,8 +219,28 @@ def visualize_patient(fixed_img, fixed_seg_img, moving_img, moving_seg_img, t_im
 
 
     
-result_dir_start = 'results/test'
+result_dir_start = 'results/test3'
+if not os.path.exists(result_dir_start):
+        os.mkdir(result_dir_start)
+'''
+image_folder = "TrainingData"
+dirs=[fold for fold in os.listdir(image_folder) if 'p' in fold]
+regs=['registration Dice '+str(i) for i in range(len(dirs))]
+ress=['resulting Dice '+str(i) for i in range(len(dirs))]
+frame=pd.DataFrame(columns=[regs,'average registration Dice',ress,'average resulting Dice'])
+
+for pat in dirs[0]: #over patient
+    result_dir_start=os.path.join('results',pat)
+    if not os.path.exists(result_dir_start):
+        os.mkdir(result_dir_start)
+    for i in range(len(dirs)): #leave one out over the atlases
+        if dirs[i]!=pat: #not register patient to itself
+            segmen,dice_reg,dice=register_patients(pat,dirs[i],result_dir_start)
+            pd.DataFrame([],columns=[])
+#label fusion
+'''
+
 fixed_subject = "p102"
-moving_subject = "p107"
+moving_subject = "p108"
 segmen,dice=register_patients(fixed_subject,moving_subject,result_dir_start)
 
