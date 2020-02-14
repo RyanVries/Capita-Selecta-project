@@ -1,10 +1,10 @@
-=D// Description: elastixpaper, bspline64
+// Description: elastixpaper, affine
 
 //ImageTypes
 (FixedInternalImagePixelType "float")
-//(FixedImageDimension 3)
+(FixedImageDimension 3)
 (MovingInternalImagePixelType "float")
-//(MovingImageDimension 3)
+(MovingImageDimension 3)
 
 //Components
 (Registration "MultiResolutionRegistration")
@@ -15,13 +15,14 @@
 (Optimizer "StandardGradientDescent")
 (ResampleInterpolator "FinalBSplineInterpolator")
 (Resampler "DefaultResampler")
-(Transform "BSplineTransform")
+(Transform "AffineTransform")
 
-(ErodeMask "false" )
+(ErodeMask "false")
+
+(AutomaticScalesEstimation "true")
+(AutomaticTransformInitialization "false")
 
 (NumberOfResolutions 4)
-(FinalGridSpacingInPhysicalUnits 64.0)
-(GridSpacingSchedule 1.0 1.0 1.0 1.0)
 
 (HowToCombineTransforms "Compose")
 
@@ -31,39 +32,40 @@
 (WriteTransformParametersEachResolution "true")
 
 //Maximum number of iterations in each resolution level:
-(MaximumNumberOfIterations 2000 ) 
+(MaximumNumberOfIterations 2000)
 
 //Number of grey level bins in each resolution level:
 (NumberOfHistogramBins 32 )
-(FixedLimitRangeRatio 0.0)
-(MovingLimitRangeRatio 0.0)
 (FixedKernelBSplineOrder 3)
 (MovingKernelBSplineOrder 3)
+(FixedLimitRangeRatio 0.0)
+(MovingLimitRangeRatio 0.0)
 
-
-//Number of spatial samples used to compute the mutual information in each resolution level:
+// sampler:
 (ImageSampler "RandomCoordinate")
-(NumberOfSpatialSamples 2000 )
-(FixedImageBSplineInterpolationOrder 1)
+(FixedImageBSplineInterpolationOrder 1 )
 (UseRandomSampleRegion "true")
 (SampleRegionSize 50.0)
 (CheckNumberOfSamples "false")
-(NewSamplesEveryIteration "true")
+(NewSamplesEveryIteration "true" )
+
+//Number of spatial samples used to compute the mutual information in each resolution level:
+(NumberOfSpatialSamples 2000 )
 
 //Order of B-Spline interpolation used in each resolution level:
-(BSplineInterpolationOrder 1)
+(BSplineInterpolationOrder 3)
 
 //Order of B-Spline interpolation used for applying the final deformation:
-(FinalBSplineInterpolationOrder 3)
+(FinalBSplineInterpolationOrder 1)
 
 //Default pixel value for pixels that come from outside the picture:
 (DefaultPixelValue 0)
 
 //SP: Param_a in each resolution level. a_k = a/(A+k+1)^alpha
-(SP_a 2000.0 )
+(SP_a 2000.0)
 
 //SP: Param_A in each resolution level. a_k = a/(A+k+1)^alpha
-(SP_A 200.0 )
+(SP_A 200.0)
 
 //SP: Param_alpha in each resolution level. a_k = a/(A+k+1)^alpha
 (SP_alpha 0.6 ) 
