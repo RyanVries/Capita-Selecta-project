@@ -20,8 +20,8 @@
 (ErodeMask "false" )
 
 (NumberOfResolutions 4)
-(FinalGridSpacingInPhysicalUnits 64.0)
-(GridSpacingSchedule 4 2 1 0.5)
+(FinalGridSpacingInPhysicalUnits 64)
+(GridSpacingSchedule 60 55 45 35)
 
 (HowToCombineTransforms "Compose")
 
@@ -54,7 +54,7 @@
 (BSplineInterpolationOrder 3)
 
 //Order of B-Spline interpolation used for applying the final deformation:
-(FinalBSplineInterpolationOrder 0)
+(FinalBSplineInterpolationOrder 1)
 
 //Default pixel value for pixels that come from outside the picture:
 (DefaultPixelValue 0)
