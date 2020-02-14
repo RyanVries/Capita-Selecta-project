@@ -1,0 +1,100 @@
+// adaptation to multires file given in excersizeafsdfas f
+
+//ImageTypes
+(FixedInternalImagePixelType "float")
+(MovingInternalImagePixelType "float")
+// The dimensions of the fixed and moving image
+(FixedImageDimension 3)
+(MovingImageDimension 3)
+
+
+//components
+//Registration setup
+(Registration "MultiResolutionRegistration")
+(FixedImagePyramid "FixedSmoothingImagePyramid")
+(MovingImagePyramid "MovingSmoothingImagePyramid")
+//interpolator missing 
+(Metric "AdvancedNormalizedCorrelation")
+(Optimizer "StandardGradientDescent")
+//was eerst RegularStepGradientDescent 
+(NumberOfResolutions 5)
+// Define pyramids of both images at multiple scales
+
+//(ResampleInterpolator "FinalBSplineInterpolator")
+//(Resampler "DefaultResampler")
+//(Transform "BSplineTransform")
+
+
+// Optimizer
+
+// Maximum number of iterations in each resolution level:
+(MaximumNumberOfIterations 500 500 500 500 500)
+
+
+// Transformation
+(Transform "BSplineTransform")
+// The control point spacing of the bspline transformation in
+// the finest resolution level. 
+(FinalGridSpacingInPhysicalUnits 32)	
+
+// Metric 
+
+(SubtractMean "true")
+
+//sampling
+(NumberOfSpatialSamples 3000)
+//was eerst 4096
+//volgende 2toegevoegd uit tutorial 
+(UseRandomSampleRegion "true")
+(SampleRegionSize 50.0 50.0 50.0)
+// Refresh these spatial samples in every iteration, and select
+// them randomly. 
+(NewSamplesEveryIteration "true")
+(ImageSampler "RandomCoordinate")
+
+// Order of B-Spline interpolation used during registration/optimisation.
+(BSplineInterpolationOrder 0)
+// was eerst 1
+
+// Order of B-Spline interpolation used for applying the final
+// deformation.
+(FinalBSplineInterpolationOrder 3)
+// was eerst 3
+(ResampleInterpolator "FinalBSplineInterpolator")
+
+
+//Default pixel value for pixels that come from outside the picture:
+(DefaultPixelValue 0)
+
+
+// Choose whether to generate the deformed moving image.
+(WriteResultImage "true")
+
+// The pixel type and format of the resulting deformed moving image
+(ResultImagePixelType "unsigned char")
+
+
+//uit tutorial, per macht van 10 testen
+(SP a 1000.0)
+
+// Some settings to avoid warnings
+(UseDirectionCosines "true")
+(Interpolator "BSplineInterpolator")
+(ResampleInterpolator "FinalBSplineInterpolator")
+(Resampler "DefaultResampler")
+(HowToCombineTransforms "Compose")
+(ErodeMask "false")
+(AutomaticScalesEstimation "true")
+(MaximumStepLength 1.0)
+(MinimumStepLength 0.01) 
+(BSplineTransformSplineOrder 3)
+(UseCyclicTransform "false")
+(ShowExactMetricValue "false")
+(CheckNumberOfSamples "true")
+(FixedImageBSplineInterpolationOrder 1)
+(UseRandomSampleRegion "false")
+(MinimumGradientMagnitude 1e-08)
+(RelaxationFactor 0.5)
+
+
+
