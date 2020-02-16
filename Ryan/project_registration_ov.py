@@ -136,7 +136,7 @@ def run_all_quick(fixed_img_name,moving_img_name):
     write_to_file(fixed_img_name, moving_img_name, output_string, "[results]")
 
 # Make a results directory if none exists
-results_dir_start = r'results/test8'
+results_dir_start = r'results/test9'
 if not os.path.exists(results_dir_start):
     os.mkdir(results_dir_start)
 elif len(os.listdir(results_dir_start)) != 0:
@@ -158,18 +158,18 @@ param_array = get_param_array(param_file_names)
 
 ########################################################################################################################
 
-regs=['registration Dice '+str(i) for i in range(len(dirs))]
+regs=['registration Dice '+dirs[i] for i in range(len(dirs))]
 regs.append('average registration Dice')
-ress=['resulting Dice '+str(i) for i in range(len(dirs))]
+ress=['resulting Dice '+dirs[i] for i in range(len(dirs))]
 ress.append('average resulting Dice')
-columns=(regs+ress)
+columns=(['Fixed image (patient)']+regs+ress+['Registration Dice Majority Vote'])
+frame=pd.DataFrame(columns=columns)
 
 sh=np.shape(GetArrayFromImage(ReadImage(os.path.join(data_dir,dirs[0],'mr_bffe.mhd'))))
 prostate_estm=np.zeros((sh[0],sh[1],sh[2],len(dirs)))
 for idx,pat in enumerate(dirs): #over patient
     prostates_estm_pat=np.zeros((sh[0],sh[1],sh[2],len(dirs)-1))
-    dices=np.zeros((2*len(dirs)+2,1))
-    frame=pd.DataFrame(columns=columns)
+    dices=np.zeros((2*len(dirs)+3,1))
     j=0
     mask = np.ones((len(dirs),1),dtype=bool)
     for i in range(len(dirs)): #leave one out over the atlases
@@ -186,12 +186,19 @@ for idx,pat in enumerate(dirs): #over patient
             dices[i]=-1
             dices[i+len(dirs)+1]=-1
             mask[i]=0
+            
+    prostate_estm[:,:,:,idx]=(np.sum(prostates_estm_pat,axis=3)>(len(dirs)/2)).astype(int)
+    majv_dice=get_score(GetArrayFromImage(ReadImage(os.path.join(data_dir,pat,'prostaat.mhd'))),prostate_estm[:,:,:,idx])
+    
     dices[len(dirs)]=np.ma.average(np.reshape(dices[0:len(dirs)],(len(dirs),1)),weights=mask)
     dices[2*len(dirs)+1]=np.ma.average(np.reshape(dices[len(dirs)+1:2*len(dirs)+1],(len(dirs),1)),weights=mask)
-    frame=frame.append(pd.Series(dices[:,0],index=columns), ignore_index=True)
-    prostate_estm[:,:,:,idx]=(np.sum(prostates_estm_pat,axis=3)>len(dirs)).astype(int)
-    frame.to_excel(os.path.join(results_dir_start,pat)+'.xlsx')
+    dices[2*len(dirs)+2]=majv_dice
+    frame=frame.append(pd.Series(dices[:,0],index=columns[1:]), ignore_index=True)
+    frame['Fixed image (patient)'].loc[0]=pat
+    print(f"Registration of patient: {pat} has been completed")
     
+frame.to_excel(os.path.join(results_dir_start,'all_results')+'.xlsx')
+print(f"Registration has been completed")
 #run_all(results_dir,True, True)
 
 # for i in range(20):
