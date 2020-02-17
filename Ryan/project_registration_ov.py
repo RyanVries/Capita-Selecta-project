@@ -194,7 +194,7 @@ for idx,pat in enumerate(dirs): #over patient
     dices[2*len(dirs)+1]=np.ma.average(np.reshape(dices[len(dirs)+1:2*len(dirs)+1],(len(dirs),1)),weights=mask)
     dices[2*len(dirs)+2]=majv_dice
     frame=frame.append(pd.Series(dices[:,0],index=columns[1:]), ignore_index=True)
-    frame['Fixed image (patient)'].loc[0]=pat
+    frame['Fixed image (patient)'].loc[idx]=pat
     print(f"Registration of patient: {pat} has been completed")
     
 frame.to_excel(os.path.join(results_dir_start,'all_results')+'.xlsx')
