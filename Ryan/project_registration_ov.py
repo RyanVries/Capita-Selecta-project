@@ -145,14 +145,14 @@ def ROC_thresholds(summed_estm_prostates,ground_truth):
     #mx=int(np.max(summed_estm_prostates))
     mx=len(dirs)
     thresholds=range(0,mx)
-    senss=np.ones((mx,1))
-    specs=np.ones((mx,1))
+    senss=np.ones((mx+1,1))
+    specs=np.zeros((mx+1,1))
     dices=np.ones((mx,1))
     for idx,thres in enumerate(thresholds):
         prost_thres=(summed_estm_prostates>thres).astype(int)
         sens,spec=score_roc(prost_thres,ground_truth)
-        senss[idx]=sens
-        specs[idx]=spec
+        senss[idx+1]=sens
+        specs[idx+1]=spec
         dices[idx]=get_score(prost_thres,ground_truth)
     specs_inv=1-specs
     plt.figure()
