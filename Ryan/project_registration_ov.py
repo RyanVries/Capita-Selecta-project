@@ -147,11 +147,13 @@ def ROC_thresholds(summed_estm_prostates,ground_truth):
     thresholds=range(0,mx)
     senss=np.ones((mx,1))
     specs=np.ones((mx,1))
+    dices=np.ones((mx,1))
     for idx,thres in enumerate(thresholds):
         prost_thres=(summed_estm_prostates>thres).astype(int)
         sens,spec=score_roc(prost_thres,ground_truth)
         senss[idx]=sens
         specs[idx]=spec
+        dices[idx]=get_score(prost_thres,ground_truth)
     specs_inv=1-specs
     plt.figure()
     plt.plot(specs_inv,senss, color='darkorange', lw=2, label='ROC curve (area = %0.2f)' % auc(specs_inv,senss))
@@ -165,14 +167,24 @@ def ROC_thresholds(summed_estm_prostates,ground_truth):
         #plt.annotate(txt, (specs_inv[n], senss[n]))
         plt.annotate(n, (specs_inv[n], senss[n]))
     #plt.savefig(os.path.join(results_dir_start,f'ROC_curve_of_thresholds_for_patient_{pat}.eps'))
-    plt.savefig(os.path.join(results_dir_start,f'ROC_curve_of_thresholds_for_patient_{pat}.png'))
+    plt.savefig(os.path.join(results_dir_start,f'ROC_curve_of_thresholds_patient_{pat}.png'))
+    plt.show()
+    
+    plt.figure()
+    plt.plot(thresholds,dices,color='black', lw=2)
+    plt.xlim([0, np.max(thresholds)])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('Threshold value')
+    plt.ylabel('Dice coëfficiënt')
+    plt.title(f'Threshold vs Dice coëfficiënt plot')
+    plt.savefig(os.path.join(results_dir_start,f'Dice_curve_patient_{pat}.png'))
     plt.show()
     #print(f'Thresholds used: {list(thresholds)}')
     
     return 
 
 # Make a results directory if none exists
-results_dir_start = r'results/test10'
+results_dir_start = r'results/test11'
 if not os.path.exists(results_dir_start):
     os.mkdir(results_dir_start)
 elif len(os.listdir(results_dir_start)) != 0:
