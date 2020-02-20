@@ -44,8 +44,8 @@
 // sampler:
 (ImageSampler "RandomCoordinate")
 (FixedImageBSplineInterpolationOrder 3)
-(UseRandomSampleRegion "true")
-(SampleRegionSize 50.0)
+//(UseRandomSampleRegion "true")
+//(SampleRegionSize 50.0)
 (CheckNumberOfSamples "false")
 (NewSamplesEveryIteration "true")
 

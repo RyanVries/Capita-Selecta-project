@@ -29,7 +29,7 @@
 (WriteResultImage "false")
 (WriteResultImageAfterEachResolution "false") 
 (WriteTransformParametersEachIteration "false")
-(WriteTransformParametersEachResolution "true")
+(WriteTransformParametersEachResolution "false")
 
 //Maximum number of iterations in each resolution level:
 (MaximumNumberOfIterations 1000)
