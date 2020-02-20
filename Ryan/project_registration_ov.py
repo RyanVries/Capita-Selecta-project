@@ -11,6 +11,7 @@ import os
 import cv2
 import pandas as pd
 import sys
+from sklearn.metrics import auc
 
 # IMPORTANT: these paths may differ on your system, depending on where
 # Elastix has been installed. Please set accordingly.
@@ -134,9 +135,56 @@ def run_all_quick(fixed_img_name,moving_img_name):
     transform = register_get_transform(image_paths[0], image_paths[1], param_array)
     output_string,_,_ = get_results(get_images(image_paths, transform), fixed_img_name, moving_img_name, False, False)
     write_to_file(fixed_img_name, moving_img_name, output_string, "[results]")
+    
+def score_roc(im,truth):
+    sens=np.sum(np.logical_and(im,truth)) / np.sum(truth)
+    spec=np.sum(np.logical_not(im)*np.logical_not(truth)) / np.sum(np.logical_not(truth))
+    return sens, spec
+    
+def ROC_thresholds(summed_estm_prostates,ground_truth):
+    #mx=int(np.max(summed_estm_prostates))
+    mx=len(dirs)
+    thresholds=range(0,mx)
+    senss=np.ones((mx+1,1))
+    specs=np.zeros((mx+1,1))
+    dices=np.ones((mx,1))
+    for idx,thres in enumerate(thresholds):
+        prost_thres=(summed_estm_prostates>thres).astype(int)
+        sens,spec=score_roc(prost_thres,ground_truth)
+        senss[idx+1]=sens
+        specs[idx+1]=spec
+        dices[idx]=get_score(prost_thres,ground_truth)
+    specs_inv=1-specs
+    plt.figure()
+    plt.plot(specs_inv,senss, color='darkorange', lw=2, label='ROC curve (area = %0.2f)' % auc(specs_inv,senss))
+    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title(f'Receiver operating characteristic curve of thresholds:\n {list(thresholds)}')
+    for n, txt in enumerate(thresholds):
+        #plt.annotate(txt, (specs_inv[n], senss[n]))
+        plt.annotate(n, (specs_inv[n], senss[n]))
+    #plt.savefig(os.path.join(results_dir_start,f'ROC_curve_of_thresholds_for_patient_{pat}.eps'))
+    plt.savefig(os.path.join(results_dir_start,f'ROC_curve_of_thresholds_patient_{pat}.png'))
+    plt.show()
+    
+    plt.figure()
+    plt.plot(thresholds,dices,color='black', lw=2)
+    plt.xlim([0, np.max(thresholds)])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('Threshold value')
+    plt.ylabel('Dice coëfficiënt')
+    plt.title(f'Threshold vs Dice coëfficiënt plot')
+    plt.savefig(os.path.join(results_dir_start,f'Dice_curve_patient_{pat}.png'))
+    plt.show()
+    #print(f'Thresholds used: {list(thresholds)}')
+    
+    return 
 
 # Make a results directory if none exists
-results_dir_start = r'results/test9'
+results_dir_start = r'results/test11'
 if not os.path.exists(results_dir_start):
     os.mkdir(results_dir_start)
 elif len(os.listdir(results_dir_start)) != 0:
@@ -188,7 +236,9 @@ for idx,pat in enumerate(dirs): #over patient
             mask[i]=0
             
     prostate_estm[:,:,:,idx]=(np.sum(prostates_estm_pat,axis=3)>(len(dirs)/2)).astype(int)
-    majv_dice=get_score(GetArrayFromImage(ReadImage(os.path.join(data_dir,pat,'prostaat.mhd'))),prostate_estm[:,:,:,idx])
+    ground_truth=GetArrayFromImage(ReadImage(os.path.join(data_dir,pat,'prostaat.mhd')))
+    majv_dice=get_score(ground_truth,prostate_estm[:,:,:,idx])
+    ROC_thresholds(np.sum(prostates_estm_pat,axis=3),ground_truth)
     
     dices[len(dirs)]=np.ma.average(np.reshape(dices[0:len(dirs)],(len(dirs),1)),weights=mask)
     dices[2*len(dirs)+1]=np.ma.average(np.reshape(dices[len(dirs)+1:2*len(dirs)+1],(len(dirs),1)),weights=mask)
