@@ -232,7 +232,9 @@ def leave_one_out(img_names,data_dir,param_array,result_file,all_results_file,b0
                 prostates_estm_pat[:,:,:,atlas_idx] = pat_pros
                 atlas_idx += 1
         
-        #Assign weights based on image similarity         
+        #Assign weights based on image similarity 
+        #Hier wordt bepaald hoe de nmi gebruikt wordt om de weights te gebruiken!
+        #In dit geval alleen genormaliseerd        
         rel_nmis = nmis_atlas/np.max(nmis_atlas)
         weights = normalize_array(rel_nmis)
         #weights = ltransform_weights(rel_nmis,b0,b1)
@@ -253,12 +255,13 @@ def leave_one_out(img_names,data_dir,param_array,result_file,all_results_file,b0
 all_image_names = ["p102", "p107", "p108", "p109", "p113", "p116", "p117", "p119", "p120", "p123", "p125", "p128", "p129", "p133", "p135"]
 #total_begin_time = time.time()
 ########################################################################################################################
-param_file_names = ["translation"]#, "affine", "parameters_test"]
+param_file_names = ["translation", "affine", "parameters_test"]
 param_array = get_param_array(param_file_names)
 
-all_results_file = "test"
-result_file = "test2"
+all_results_file = "test"  #Resultaten voor alle vergelijkingen afbeeldingen
+result_file = "test2"      #Alleen totale dice scores
 
+#Parameters voor lineaire transformatie maar is nu niet echt meer nodig maar ok
 b0 = -4.9024
 b1 = 5.3462
 
