@@ -28,6 +28,7 @@ el = elastix.ElastixInterface(elastix_path=ELASTIX_PATH)
 # Define the paths to the images you want to register and the parameter files
 data_dir = r"TrainingData"
 param_dir = r"Parameters"
+image_dir = r"Images\translation-affine-parameters_test"
 
 def get_param_array(names):
     #Appends a .txt extension to the file names listed in 'names' and returns
@@ -173,21 +174,46 @@ def register_images(fixed_img_name,moving_img_name,param_array):
     #similarity metric values and duration of registration
     image_paths = get_image_paths(fixed_img_name, moving_img_name)
     begin_time = time.time()
-    transform = register_get_transform(image_paths[0], image_paths[1], param_array)
+    #transform = register_get_transform(image_paths[0], image_paths[1], param_array)
     duration = time.time() - begin_time
-    fixed_mr_img, moving_mr_img, transformed_moving_mr_img, \
-    fixed_pros_img, moving_pros_img, transformed_moving_pros_img = transform_images(image_paths, transform)
+    #fixed_mr_img, moving_mr_img, transformed_moving_mr_img, \
+    #fixed_pros_img, moving_pros_img, transformed_moving_pros_img = transform_images(image_paths, transform)
+    fixed_mr_img, moving_mr_img, fixed_pros_img, moving_pros_img = retrieve_images(image_paths)
+    
+    transformed_moving_mr_img,transformed_moving_pros_img = retrieve_transformed_images(fixed_img_name, moving_img_name, len(param_array))
     dices, nccs, nmis = compute_metrics(fixed_mr_img, moving_mr_img, transformed_moving_mr_img,
     fixed_pros_img, moving_pros_img, transformed_moving_pros_img)
     
     return transformed_moving_pros_img,dices,nccs,nmis,duration
 
+def retrieve_images(input_img_paths):
+    #Retrieve fixed and moving mr and segmentation images
+    fixed_mr_img = GetArrayFromImage(ReadImage(input_img_paths[0]))
+    moving_mr_img = GetArrayFromImage(ReadImage(input_img_paths[1]))
+    
+    fixed_pros_img = GetArrayFromImage(ReadImage(input_img_paths[2]))
+    moving_pros_img = GetArrayFromImage(ReadImage(input_img_paths[3]))
+    
+    return fixed_mr_img,moving_mr_img,fixed_pros_img,moving_pros_img
+
+def retrieve_transformed_images(fixed_img_name,moving_img_name,nr_params):
+    #Retrieve transformed images (assuming these already exist)
+    t_moving_path = os.path.join(image_dir,f"{fixed_img_name}-{moving_img_name}",f"{nr_params-1}")
+    t_moving_pros_path = os.path.join(t_moving_path,"pros","result.mhd")
+    t_moving_img_path = os.path.join(t_moving_path,"mr","result.mhd")
+    transformed_moving_pros_img = GetArrayFromImage(ReadImage(t_moving_pros_path))
+    transformed_moving_mr_img = GetArrayFromImage(ReadImage(t_moving_img_path))
+    return transformed_moving_mr_img,transformed_moving_pros_img
+
 def atlas_segmentation(atlas, vote_threshold=0.5, weights=None):
     #Performs atlas-based segmentation based on a set of binary label images
     atlas_size = atlas.shape[3]
     
+    #If weights = none, simply add the segmentations
     if weights is None:
         combined = np.sum(atlas, axis = 3)/atlas_size
+        
+    #If weights are provided, multiply each atlas image with its corresponding weight
     else:
         combined = np.zeros((atlas.shape[0],atlas.shape[1],atlas.shape[2]))
         for atlas_id in range(atlas_size):
@@ -232,12 +258,14 @@ def leave_one_out(img_names,data_dir,param_array,result_file,all_results_file,b0
                 prostates_estm_pat[:,:,:,atlas_idx] = pat_pros
                 atlas_idx += 1
         
-        #Assign weights based on image similarity 
+        #Assign weights based on image similarity
         #Hier wordt bepaald hoe de nmi gebruikt wordt om de weights te gebruiken!
-        #In dit geval alleen genormaliseerd        
+        #In dit geval alleen genormaliseerd             
         rel_nmis = nmis_atlas/np.max(nmis_atlas)
         weights = normalize_array(rel_nmis)
         #weights = ltransform_weights(rel_nmis,b0,b1)
+        #weights = np.ones(14)
+       # weights = weights1**2
         print('weights',weights)
         
         prostate_estm[:,:,:,pat_idx] = atlas_segmentation(prostates_estm_pat,weights=weights)
@@ -250,6 +278,8 @@ def leave_one_out(img_names,data_dir,param_array,result_file,all_results_file,b0
         print(score_string)
     
     print(f"Registration has been completed\n")
+    dice_av = np.mean(seg_dices)
+    print(f"Average dice: {dice_av}")
     return
     
 all_image_names = ["p102", "p107", "p108", "p109", "p113", "p116", "p117", "p119", "p120", "p123", "p125", "p128", "p129", "p133", "p135"]
@@ -262,8 +292,10 @@ all_results_file = "test"  #Resultaten voor alle vergelijkingen afbeeldingen
 result_file = "test2"      #Alleen totale dice scores
 
 #Parameters voor lineaire transformatie maar is nu niet echt meer nodig maar ok
-b0 = -4.9024
-b1 = 5.3462
+#b0 = -4.9024
+#b1 = 5.3462
+b0 = -5.7409
+b1 = 6.1845
 
-leave_one_out(all_image_names[:3],data_dir,param_array,all_results_file,result_file,b0,b1)
+leave_one_out(all_image_names,data_dir,param_array,result_file,all_results_file,b0,b1)
 
