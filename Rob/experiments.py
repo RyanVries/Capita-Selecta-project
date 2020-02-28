@@ -1,4 +1,5 @@
 from SimpleITK import GetArrayFromImage, ReadImage
+from predetermined_weights import predetermined_weights_matrix
 import numpy as np
 import metrics
 import os
@@ -26,107 +27,152 @@ def get_original_image(input_image, img_type="prostaat"):
 
 def get_normalized_nmi_weight(input_fixed_img, input_moving_img):
     nmi = metrics.nmi(input_fixed_img, input_moving_img)
-    return nmi - 1.006
-
-def get_normalized_ncc_weight(input_fixed_img, input_moving_img):
-    ncc = metrics.ncc(input_fixed_img, input_moving_img)
-    return ncc + 0.025
+    return nmi - 1.00591886842159
 
 def write_to_txt(write_string):
-    f = open(f"{RESULTS_PATH}/{FOLDER_NAME}_.txt", 'a')
+    f = open(f"{RESULTS_PATH}/{FOLDER_NAME}=experiments.txt", 'a')
     f.write(f"{write_string}\n")
     f.close()
-
-def get_predetermined_weights(input_leave_out_img):
-    temp_img_names = all_image_names.copy()
-    temp_img_names.remove(input_leave_out_img)
-    return_weights = np.zeros(14)
-    for fixed_img_name in temp_img_names:
-        fixed_img = get_original_image(fixed_img_name)
-        for i, moving_img_name in enumerate(temp_img_names):
-            if fixed_img_name is not moving_img_name:
-                return_weights[i] += metrics.dice(fixed_img, get_transformed_image(fixed_img_name, moving_img_name)) / 14
-    print_string = np.array2string(return_weights, separator="\t")[1:-1].replace("\n", "\t")
-    print(print_string, end="\t| ", flush=True)
-    write_to_txt(print_string)
-    return return_weights
 
 def get_live_weights(input_fixed_img_name, weight_func):
     temp_img_names = all_image_names.copy()
     temp_img_names.remove(input_fixed_img_name)
     return_weights = np.zeros(14)
     fixed_img = get_original_image(input_fixed_img_name, img_type="mr_bffe")
-    for i, moving_img_name in enumerate(temp_img_names):
-        return_weights[i] = weight_func(fixed_img, get_transformed_image(input_fixed_img_name, moving_img_name, img_type="mr"))
-    print(np.array2string(return_weights, separator="   ")[1:-1].replace("\n", "   "), end="\t| ", flush=True)
-
+    for index, moving_img_name in enumerate(temp_img_names):
+        return_weights[index] = weight_func(fixed_img, get_transformed_image(input_fixed_img_name, moving_img_name, img_type="mr"))
     return return_weights
 
-def get_dice_for_img_weights(input_test_img, input_weights):
+def squared(input_values):
+    return input_values ** 2
+
+def get_prediction_from_weights(input_test_img, input_weights):
     temp_img_names = all_image_names.copy()
     temp_img_names.remove(input_test_img)
     prediction = np.zeros((86, 333, 271))
-    for i, moving_img_name in enumerate(temp_img_names):
-        prediction += get_transformed_image(input_test_img, moving_img_name) * input_weights[i]
-    original_img = get_original_image(input_test_img)
-    # for threshold in np.arange(0.0, 1.0, 0.025):
-    threshold = 0.5
-    final_dice = metrics.dice(original_img, prediction > (np.sum(input_weights) * threshold))
-    print(f"\t{final_dice:.3f}", end="", flush=True)
-    print("")
-    return final_dice
+    for index, moving_img_name in enumerate(temp_img_names):
+        prediction += get_transformed_image(input_test_img, moving_img_name) * input_weights[index]
+    return prediction
 
-np.set_printoptions(precision=3)
+def get_threshold_dices(input_img, input_prediction, input_weights):
+    dice_array = np.zeros(len(thresholds))
+    for i, threshold in enumerate(thresholds):
+        dice_array[i] = metrics.dice(input_img, input_prediction > (np.sum(input_weights) * threshold))
+    return dice_array
+
+def print_threshold_dice_values(input_dice_matrix):
+    average_dice = np.average(input_dice_matrix, 0)
+    average_dice_string = np.array2string(average_dice, separator="\t")[1:-1].replace("\n", "\t")
+    max_index = np.argmax(average_dice)
+    final_string = f"{average_dice_string}\t{thresholds[max_index]}\t{average_dice[max_index]}"
+    write_to_txt(final_string)
+
+def print_threshold_dice_value(input_dice_array):
+    final_string = np.array2string(input_dice_array, separator="\t")[1:-1].replace("\n", "\t")
+    write_to_txt(final_string)
+
+##########################################################
+def loop_all_default():
+    dice_matrix = np.zeros((len(all_image_names), len(thresholds)))
+    weights = np.ones(14)
+    for i, test_img_name in enumerate(all_image_names):
+        print(".", end="", flush=True)
+        test_img = get_original_image(test_img_name)
+        prediction = get_prediction_from_weights(test_img_name, weights)
+        dice_matrix[i] = get_threshold_dices(test_img, prediction, weights)
+    print("")
+    print_threshold_dice_values(dice_matrix)
+
+def loop_all_nmi(input_func):
+    dice_matrix = np.zeros((len(all_image_names), len(thresholds)))
+    for i, test_img_name in enumerate(all_image_names):
+        print(".", end="", flush=True)
+        test_img = get_original_image(test_img_name)
+        weights = get_live_weights(test_img_name, get_normalized_nmi_weight)
+        if input_func is not None:
+            weights = input_func(weights)
+        prediction = get_prediction_from_weights(test_img_name, weights)
+        dice_matrix[i] = get_threshold_dices(test_img, prediction, weights)
+    print("")
+    print_threshold_dice_values(dice_matrix)
+
+def loop_all_predetermined(normalize, input_func):
+    dice_matrix = np.zeros((len(all_image_names), len(thresholds)))
+    for i, test_img_name in enumerate(all_image_names):
+        print(".", end="", flush=True)
+        test_img = get_original_image(test_img_name)
+        weights = predetermined_weights_matrix[i]
+        if normalize:
+            weights -= np.min(weights)
+        if input_func is not None:
+            weights = input_func(weights)
+        prediction = get_prediction_from_weights(test_img_name, weights)
+        dice_matrix[i] = get_threshold_dices(test_img, prediction, weights)
+    print("")
+    print_threshold_dice_values(dice_matrix)
+
+##########################################################
+def loop_all_default_threshold(threshold):
+    dice_array = np.zeros(len(all_image_names))
+    weights = np.ones(14)
+    for i, test_img_name in enumerate(all_image_names):
+        print(".", end="", flush=True)
+        test_img = get_original_image(test_img_name)
+        prediction = get_prediction_from_weights(test_img_name, weights)
+        dice_array[i] = metrics.dice(test_img, prediction > (np.sum(weights) * threshold))
+    print("")
+    print_threshold_dice_value(dice_array)
+
+def loop_all_nmi_threshold(input_func, threshold):
+    dice_array = np.zeros(len(all_image_names))
+    for i, test_img_name in enumerate(all_image_names):
+        print(".", end="", flush=True)
+        test_img = get_original_image(test_img_name)
+        weights = get_live_weights(test_img_name, get_normalized_nmi_weight)
+        if input_func is not None:
+            weights = input_func(weights)
+        prediction = get_prediction_from_weights(test_img_name, weights)
+        dice_array[i] = metrics.dice(test_img, prediction > (np.sum(weights) * threshold))
+    print("")
+    print_threshold_dice_value(dice_array)
+
+def loop_all_predetermined_threshold(normalize, input_func, threshold):
+    dice_array = np.zeros(len(all_image_names))
+    for i, test_img_name in enumerate(all_image_names):
+        print(".", end="", flush=True)
+        test_img = get_original_image(test_img_name)
+        weights = predetermined_weights_matrix[i]
+        if normalize:
+            weights -= np.min(weights)
+        if input_func is not None:
+            weights = input_func(weights)
+        prediction = get_prediction_from_weights(test_img_name, weights)
+        dice_array[i] = metrics.dice(test_img, prediction > (np.sum(weights) * threshold))
+    print("")
+    print_threshold_dice_value(dice_array)
+
+np.set_printoptions(precision=5)
+thresholds = np.arange(0.0, 1.0, 0.01)
+write_to_txt("------------------------------\n")  # + np.array2string(thresholds, separator="\t")[1:-1].replace("\n", "\t"))
 all_image_names = ["p102", "p107", "p108", "p109", "p113", "p116", "p117", "p119", "p120", "p123", "p125", "p128", "p129", "p133", "p135"]
 
-predetermined_weights_matrix = np.array([[0.591, 0.6, 0.665, 0.548, 0.748, 0.477, 0.643, 0.718, 0.631, 0.658, 0.694, 0.743, 0.581, 0.655],
-                                         [0.733, 0.611, 0.668, 0.535, 0.749, 0.467, 0.647, 0.718, 0.641, 0.656, 0.691, 0.746, 0.59, 0.653],
-                                         [0.731, 0.592, 0.664, 0.515, 0.74, 0.484, 0.634, 0.708, 0.692, 0.661, 0.684, 0.733, 0.583, 0.653],
-                                         [0.738, 0.598, 0.595, 0.546, 0.745, 0.483, 0.649, 0.741, 0.645, 0.664, 0.699, 0.745, 0.583, 0.656],
-                                         [0.735, 0.647, 0.585, 0.685, 0.742, 0.52, 0.683, 0.709, 0.655, 0.684, 0.681, 0.733, 0.618, 0.656],
-                                         [0.727, 0.588, 0.585, 0.658, 0.52, 0.475, 0.634, 0.709, 0.629, 0.652, 0.682, 0.733, 0.575, 0.642],
-                                         [0.738, 0.595, 0.622, 0.678, 0.555, 0.772, 0.679, 0.728, 0.651, 0.662, 0.701, 0.752, 0.596, 0.678],
-                                         [0.732, 0.592, 0.595, 0.668, 0.539, 0.743, 0.477, 0.712, 0.636, 0.663, 0.681, 0.733, 0.589, 0.645],
-                                         [0.734, 0.647, 0.589, 0.669, 0.534, 0.744, 0.483, 0.636, 0.632, 0.668, 0.678, 0.733, 0.632, 0.661],
-                                         [0.729, 0.593, 0.596, 0.664, 0.543, 0.743, 0.477, 0.638, 0.714, 0.657, 0.688, 0.738, 0.581, 0.647],
-                                         [0.736, 0.586, 0.65, 0.665, 0.545, 0.746, 0.495, 0.644, 0.722, 0.635, 0.689, 0.743, 0.583, 0.645],
-                                         [0.73, 0.588, 0.588, 0.656, 0.531, 0.742, 0.468, 0.635, 0.71, 0.632, 0.656, 0.737, 0.579, 0.642],
-                                         [0.73, 0.591, 0.586, 0.656, 0.517, 0.741, 0.483, 0.633, 0.708, 0.632, 0.659, 0.68, 0.598, 0.648],
-                                         [0.732, 0.604, 0.626, 0.669, 0.54, 0.748, 0.489, 0.667, 0.72, 0.639, 0.66, 0.715, 0.747, 0.668],
-                                         [0.737, 0.6, 0.62, 0.674, 0.552, 0.754, 0.482, 0.642, 0.728, 0.641, 0.662, 0.685, 0.75, 0.587]])
-predetermined_weights_matrix[predetermined_weights_matrix < 0.5] = 0
-###############################################################################################
-# total_dice = 0
-# for test_img in all_image_names:
-#     print(test_img, end=" | ", flush=True)
-#     dice = get_dice_for_img_weights(test_img, np.ones(14))
-#     total_dice += dice
-# print(f"final dice: {total_dice / 15}\n")
+# loop_all_default()
+# loop_all_nmi(None)
+# loop_all_nmi(squared)
+# loop_all_predetermined(False, None)
+# loop_all_predetermined(True, None)
+# loop_all_predetermined(True, squared)
 
-###############################################################################################
-total_dice = 0
-for i, test_img in enumerate(all_image_names):
-    print(test_img, end=" | ", flush=True)
-    # weights = get_predetermined_weights(test_img)
-    weights = predetermined_weights_matrix[i]
-    dice = get_dice_for_img_weights(test_img, weights)
-    total_dice += dice
-print(f"final dice: {total_dice / 15}\n")
+loop_all_default_threshold(0.49)
+loop_all_nmi_threshold(None, 0.43)
+loop_all_nmi_threshold(squared, 0.45)
+loop_all_predetermined_threshold(False, None, 0.43)
+loop_all_predetermined_threshold(True, None, 0.41)
+loop_all_predetermined_threshold(True, squared, 0.44)
 
-# ###############################################################################################
-# total_dice = 0
-# for test_img in all_image_names:
-#     print(test_img, end=" | ", flush=True)
-#     weights = get_live_weights(test_img, get_normalized_nmi_weight)
-#     dice = get_dice_for_img_weights(test_img, weights)
-#     total_dice += dice
-# print(f"final dice: {total_dice / 15}\n")
-#
-# ###############################################################################################
-# total_dice = 0
-# for test_img in all_image_names:
-#     print(test_img, end=" | ", flush=True)
-#     weights = get_live_weights(test_img, get_normalized_ncc_weight)
-#     dice = get_dice_for_img_weights(test_img, weights)
-#     total_dice += dice
-# print(f"final dice: {total_dice / 15}\n")
+# loop_all_default_threshold(0.5)
+# loop_all_nmi_threshold(None, 0.5)
+# loop_all_nmi_threshold(squared, 0.5)
+# loop_all_predetermined_threshold(False, None, 0.5)
+# loop_all_predetermined_threshold(True, None, 0.5)
+# loop_all_predetermined_threshold(True, squared, 0.5)
