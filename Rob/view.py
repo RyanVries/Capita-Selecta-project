@@ -41,9 +41,5 @@ def show_figure(fixed_img_path, moving_img_path, single_fraction=1, both_fractio
 # fixed_image_name, moving_image_name = np.random.choice(all_imgs, 2, replace=False)
 # show_figure(fixed_image_name, moving_image_name)
 
-# 1 translate/rigid als eerste verschil
-# 2 partial predetermined weights + part MI score
-# 3 elke registratie: check MI, als lager dan ervoor, skip, pak hoogste MI
-
 # show_figure(f"{data_dir}/p113/prostaat.mhd", f"{data_dir}/p117/prostaat.mhd")
 show_figure(f"{data_dir}/p113/prostaat.mhd", r"F:\_images_\translation-affine-parameters_test\p113-p117\2\pros\result.mhd")
