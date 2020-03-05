@@ -63,7 +63,6 @@ for valid_img_name in all_validation_image_names:
     valid_img = GetArrayFromImage(ReadImage(valid_img_path))
     weights = np.zeros(nr_atlas_images)
     predictions = np.zeros((nr_atlas_images, 86, 333, 271))
-
     for i, atlas_img_name in enumerate(all_training_image_names):
         print(f"{atlas_img_name}", end="\t", flush=True)
         atlas_mr_img_path = f"{TRAINING_DATA_PATH}/{atlas_img_name}/mr_bffe.mhd"
@@ -76,5 +75,6 @@ for valid_img_name in all_validation_image_names:
     prediction = np.zeros((86, 333, 271))
     for i in range(nr_atlas_images):
         prediction += predictions[i] * weights[i]
+    prediction = (prediction > 0.45 * np.sum(weights)).astype(np.uint8)
     write_mhd(valid_img_name, prediction)
     print(time.time() - begin_time)
