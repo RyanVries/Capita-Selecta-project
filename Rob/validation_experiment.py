@@ -33,16 +33,12 @@ def get_param_array(names):
         return_array.append(os.path.join(PARAM_PATH, name + ".txt"))
     return return_array
 
-def get_squared_normalized_nmi_weight(input_fixed_img, input_moving_img):
-    nmi = metrics.nmi(input_fixed_img, input_moving_img)
-    return (nmi - 1.00591886842159) ** 2
-
 def get_transform(fixed_img_path, moving_img_path):
     el.register(fixed_image=fixed_img_path, moving_image=moving_img_path, parameters=param_array, output_dir=TEMP_RESULTS_PATH, verbose=False)
     transform_path = os.path.join(TEMP_RESULTS_PATH, f"TransformParameters.{len(param_array) - 1}.txt")
     return elastix.TransformixInterface(parameters=transform_path, transformix_path=TRANSFORMIX_PATH)
 
-def get_transformed_binary(input_img_path, input_transform):
+def get_transformed_image(input_img_path, input_transform):
     transformed_path = input_transform.transform_image(input_img_path, output_dir=TEMP_RESULTS_PATH, verbose=False)
     return GetArrayFromImage(ReadImage(transformed_path))
 
@@ -59,23 +55,26 @@ all_validation_image_names = ["p137", "p141", "p143", "p144", "p147"]
 param_file_names = ["translation", "affine", "parameters_test"]
 param_array = get_param_array(param_file_names)
 
+nr_atlas_images = len(all_training_image_names)
 for valid_img_name in all_validation_image_names:
     begin_time = time.time()
     print(f"{valid_img_name} |", end="\t", flush=True)
     valid_img_path = f"{VALIDATION_DATA_PATH}/{valid_img_name}/mr_bffe.mhd"
     valid_img = GetArrayFromImage(ReadImage(valid_img_path))
-    threshold = 0
-    prediction = np.zeros((86, 333, 271))
+    weights = np.zeros(nr_atlas_images)
+    predictions = np.zeros((nr_atlas_images, 86, 333, 271))
+
     for i, atlas_img_name in enumerate(all_training_image_names):
         print(f"{atlas_img_name}", end="\t", flush=True)
         atlas_mr_img_path = f"{TRAINING_DATA_PATH}/{atlas_img_name}/mr_bffe.mhd"
         atlas_pros_img_path = f"{TRAINING_DATA_PATH}/{atlas_img_name}/prostaat.mhd"
-        atlas_img = GetArrayFromImage(ReadImage(atlas_mr_img_path))
         transform = get_transform(valid_img_path, atlas_mr_img_path)
-        registered_img = get_transformed_binary(atlas_pros_img_path, transform)
-        weight = get_squared_normalized_nmi_weight(valid_img, atlas_img)
-        prediction += registered_img * weight
-        threshold += weight * 0.45
-    prediction = (prediction > threshold).astype(np.uint8)
+        transformed_atlas_mr_img = get_transformed_image(atlas_mr_img_path, transform)
+        predictions[i] = get_transformed_image(atlas_pros_img_path, transform)
+        weights[i] = metrics.nmi(valid_img, transformed_atlas_mr_img)
+    weights = (weights - np.min(weights)) ** 2
+    prediction = np.zeros((86, 333, 271))
+    for i in range(nr_atlas_images):
+        prediction += predictions[i] * weights[i]
     write_mhd(valid_img_name, prediction)
     print(time.time() - begin_time)
