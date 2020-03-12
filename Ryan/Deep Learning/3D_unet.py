@@ -76,7 +76,7 @@ cv=3
 depth = 4
 channels = 32
 use_batchnorm = True
-batch_size = 2
+batch_size = 5
 epochs = 100#250
 input_shape=tuple([1]+sample_shape)
 val_img=2 #number of validation images
@@ -127,7 +127,7 @@ for i in range(cv):
             pros=y_pred[y_pred>=0.5]
             back=y_pred[y_pred<0.5]
             
-            if (np.sum(pros>conf)/np.size(pros))>min_conf_rat and (np.sum(back<(1-conf))/np.size(pros))>min_conf_rat:
+            if (np.sum(pros>conf)/np.size(pros))>min_conf_rat and (np.sum(back<(1-conf))/np.size(back))>min_conf_rat:
                 x_lab=np.concatenate((x_lab,np.expand_dims(x_unlab[u],axis=1)),axis=0)
                 y_lab=np.concatenate((y_lab,np.expand_dims(y_pred>=0.5,axis=1)),axis=0)
                 x_unlab=np.delete(x_unlab,u,axis=0)
