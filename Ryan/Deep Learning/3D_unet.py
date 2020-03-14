@@ -64,7 +64,8 @@ data_dir = r"TrainingData" #Change to your data directory
 data_dir_test=r"TestData"
 data_dir_unlab=r"UnlabeledData"
 results_dir=r"results"
-exp_name='test0'
+exp_name='test1'
+exp='Full'  #'Baseline','Simple','Full'
 
 #Image shape to which the original images will be subsampled. For now, each
 #dimension must be divisible by pool_size^depth (2^4 = 16 by default)
@@ -80,7 +81,12 @@ test_data,test_labels=get_data_array(data_dir_test,new_shape=sample_shape)
 
 
 # hyperparameters
-max_it=10
+if exp=='Baseline':
+    max_it=0
+elif exp=='Simple':
+    max_it=1
+elif exp=='Full':
+    max_it=10
 conf=0.9  #what is a confident prediction
 min_conf_rat=0.9  #minimal fraction of confident predictions needed to pass unlabaled image
 cv=len(data)
@@ -168,6 +174,7 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
                                     shuffle=True)
         
         y_pred_unlab=model.predict(x_unlab)
+        dels=[]
         for u in range(len(y_pred_unlab)):
             y_pred=y_pred_unlab[u]
             
@@ -178,7 +185,8 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
                 if (np.sum(pros>conf)/np.size(pros))>min_conf_rat and (np.sum(back<(1-conf))/np.size(back))>min_conf_rat:
                     x_lab=np.concatenate((x_lab,np.expand_dims(x_unlab[u],axis=1)),axis=0)
                     y_lab=np.concatenate((y_lab,np.expand_dims(y_pred>=0.5,axis=1)),axis=0)
-                    x_unlab=np.delete(x_unlab,u,axis=0)
+                    dels.append(u)
+        x_unlab=np.delete(x_unlab,dels,axis=0)
         model.save_weights(os.path.join(results_dir,f'cv{i}',f'it{it}','weights.hdf5'))
         
                 
