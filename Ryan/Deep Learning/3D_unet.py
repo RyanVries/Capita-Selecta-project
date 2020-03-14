@@ -170,10 +170,11 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
             pros=y_pred[y_pred>=0.5]
             back=y_pred[y_pred<0.5]
             
-            if (np.sum(pros>conf)/np.size(pros))>min_conf_rat and (np.sum(back<(1-conf))/np.size(back))>min_conf_rat:
-                x_lab=np.concatenate((x_lab,np.expand_dims(x_unlab[u],axis=1)),axis=0)
-                y_lab=np.concatenate((y_lab,np.expand_dims(y_pred>=0.5,axis=1)),axis=0)
-                x_unlab=np.delete(x_unlab,u,axis=0)
+            if np.sum(pros)!=0 and np.sum(back)!=0:
+                if (np.sum(pros>conf)/np.size(pros))>min_conf_rat and (np.sum(back<(1-conf))/np.size(back))>min_conf_rat:
+                    x_lab=np.concatenate((x_lab,np.expand_dims(x_unlab[u],axis=1)),axis=0)
+                    y_lab=np.concatenate((y_lab,np.expand_dims(y_pred>=0.5,axis=1)),axis=0)
+                    x_unlab=np.delete(x_unlab,u,axis=0)
         model.save_weights(os.path.join(results_dir,f'cv{i}',f'it{it}','weights.hdf5'))
         
                 
