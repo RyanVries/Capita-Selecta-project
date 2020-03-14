@@ -80,11 +80,10 @@ test_data,test_labels=get_data_array(data_dir_test,new_shape=sample_shape)
 
 
 # hyperparameters
-max_it=1
+max_it=10
 conf=0.9  #what is a confident prediction
 min_conf_rat=0.9  #minimal fraction of confident predictions needed to pass unlabaled image
-#cv=len(data)
-cv=1
+cv=len(data)
 depth = 4
 channels = 32
 use_batchnorm = True
