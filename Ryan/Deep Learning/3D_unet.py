@@ -7,6 +7,8 @@ import glob
 import os
 import sys
 import cv2
+import time
+import pandas as pd
 
 import tensorflow as tf
 import scipy.ndimage
@@ -15,6 +17,7 @@ import scipy.misc
 from SimpleITK import GetArrayFromImage, ReadImage
 from sklearn.model_selection import train_test_split, KFold
 from scipy.ndimage.interpolation import zoom
+from keras.preprocessing.image import ImageDataGenerator
 
 from keras.models import load_model
 from keras.optimizers import Adam, SGD
@@ -60,6 +63,8 @@ def get_data_array(data_dir, new_shape, shuffle=False,unlabeled=False):
 data_dir = r"TrainingData" #Change to your data directory
 data_dir_test=r"TestData"
 data_dir_unlab=r"UnlabeledData"
+results_dir=r"results"
+exp_name='test0'
 
 #Image shape to which the original images will be subsampled. For now, each
 #dimension must be divisible by pool_size^depth (2^4 = 16 by default)
@@ -75,7 +80,7 @@ test_data,test_labels=get_data_array(data_dir_test,new_shape=sample_shape)
 
 
 # hyperparameters
-max_it=10
+max_it=3
 conf=0.8  #what is a confident prediction
 min_conf_rat=0.8  #minimal amount of confident predictions needed to pass unlabaled image
 cv=len(data)
@@ -83,7 +88,7 @@ depth = 4
 channels = 32
 use_batchnorm = True
 batch_size = 5
-epochs = 100#250
+epochs = 1#250
 input_shape=tuple([1]+sample_shape)
 val_img=1 #number of validation images
 #steps_per_epoch = int(np.ceil((patches_per_im * len(train_images)) / batch_size))
@@ -103,8 +108,25 @@ kf = KFold(n_splits=cv) #leave-one-out-approach
 
 val_dice=np.zeros([cv,val_img])
 models=[]
-print('Pre-Processing finished'+'\n'+'Model training Starting'+'\n')
+
+if not os.path.exists(results_dir):
+    os.mkdir(results_dir)
+    
+results_dir=os.path.join(results_dir,exp_name)
+if not os.path.exists(results_dir):
+    os.mkdir(results_dir)
+elif len(os.listdir(results_dir)) != 0:
+    inp = input("OK to overwrite? (y/n) ")
+    if inp != 'y':
+        sys.exit()
+        
+        
+print('Pre-Processing finished'+'\n'+'Model training starting'+'\n')
 for i,(train_index, val_index) in enumerate(kf.split(data)):
+    if not os.path.exists(os.path.join(results_dir,f'cv{i}')):
+        os.mkdir(os.path.join(results_dir,f'cv{i}'))
+    
+    begin_time=time.time()
     model = unet_model_3d(input_shape=input_shape,initial_learning_rate=1e-1,depth=4,n_base_filters=16,batch_normalization=use_batchnorm)
 
     print(f'Cross-Validation step {i+1} of {cv}'+'\n')
@@ -115,18 +137,32 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
     x_val=data[val_index]
     y_val=labels[val_index]
     
+
     it=0
     while len(x_unlab)!=0 and it<max_it:
         it=it+1
         print(f'Start of Iteration {it} of {max_it} with {len(x_lab)} labeled and {len(x_unlab)} unlabeled images'+'\n')
-        steps_per_epoch=np.ceil(len(x_lab)/batch_size)
+        if not os.path.exists(os.path.join(results_dir,f'cv{i}',f'it{it}')):
+            os.mkdir(os.path.join(results_dir,f'cv{i}',f'it{it}'))
+        
+        #train_datagen = ImageDataGenerator(horizontal_flip=True, vertical_flip=True,rotation_range=90)
+        #train_generator = train_datagen.flow(x_lab, y_lab, batch_size=batch_size, shuffle=True)
+
+        #val_datagen = ImageDataGenerator(horizontal_flip=True, vertical_flip=True,rotation_range=90)
+        #val_generator = train_datagen.flow(x_val, y_val, batch_size=batch_size, shuffle=True)
+
+        #steps_per_epoch=np.ceil(len(x_lab)/batch_size)
         #model.set_weights(pre-weights)
         history=model.fit(x_lab,    #nu dus geen re-initialisatie van weights!!
                           y_lab,
                           epochs=epochs,
                           batch_size=batch_size,
                           validation_data=(x_val,y_val))   
-                          
+        #history = model.fit_generator(train_generator, 
+                        #epochs=epochs,
+                        #validation_data=val_generator,
+                        #shuffle=True)
+        
         y_pred_unlab=model.predict(x_unlab)
         for u in range(len(y_pred_unlab)):
             y_pred=y_pred_unlab[u]
@@ -138,12 +174,15 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
                 x_lab=np.concatenate((x_lab,np.expand_dims(x_unlab[u],axis=1)),axis=0)
                 y_lab=np.concatenate((y_lab,np.expand_dims(y_pred>=0.5,axis=1)),axis=0)
                 x_unlab=np.delete(x_unlab,u,axis=0)
-                
+        model.save_weights(os.path.join(results_dir,f'cv{i}',f'it{it}','weights.hdf5'))
+        
                 
     if len(x_unlab)!=0:
         print(f'Self-Training has failed: {len(x_unlab)} unlabeled images remaining'+'\n')
     else:
         print(f'Self-Traning has succeeded'+'\n')
+        
+    model.save_weights(os.path.join(results_dir,f'cv{i}','end_weights.hdf5'))
         
     y_pred_val=model.predict(x_val)   
     for v in range(val_img):
@@ -151,6 +190,11 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
     print(f'Mean Validation Dice overlap of {np.mean(val_dice[i,:])}'+'\n')
     models.append(model)
     
+    print(f'Time expired for cross-validation step {i+1}: {int(time.time() - begin_time)} sec.')
+valco=[f'Validation image {v}' for v in range(val_img)]
+columns=['Cross-Validation step']+valco
+frame=pd.DataFrame(np.column_stack((list(range(1,cv+1))+ ['mean','std'],np.vstack([val_dice,np.mean(val_dice,axis=0),np.std(val_dice,axis=0)]))),columns=columns)
+frame.to_excel(os.path.join(results_dir,'results.xlsx'),index=False)
 print('Process has finished')
         
     
