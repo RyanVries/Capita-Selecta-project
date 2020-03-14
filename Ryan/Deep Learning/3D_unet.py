@@ -17,7 +17,7 @@ import scipy.misc
 from SimpleITK import GetArrayFromImage, ReadImage
 from sklearn.model_selection import train_test_split, KFold
 from scipy.ndimage.interpolation import zoom
-from keras.preprocessing.image import ImageDataGenerator
+from tweaked_ImageGenerator import customImageDataGenerator
 
 from keras.models import load_model
 from keras.optimizers import Adam, SGD
@@ -80,15 +80,16 @@ test_data,test_labels=get_data_array(data_dir_test,new_shape=sample_shape)
 
 
 # hyperparameters
-max_it=3
-conf=0.8  #what is a confident prediction
-min_conf_rat=0.8  #minimal amount of confident predictions needed to pass unlabaled image
-cv=len(data)
+max_it=1
+conf=0.9  #what is a confident prediction
+min_conf_rat=0.9  #minimal fraction of confident predictions needed to pass unlabaled image
+#cv=len(data)
+cv=1
 depth = 4
 channels = 32
 use_batchnorm = True
 batch_size = 5
-epochs = 1#250
+epochs = 100#250
 input_shape=tuple([1]+sample_shape)
 val_img=1 #number of validation images
 #steps_per_epoch = int(np.ceil((patches_per_im * len(train_images)) / batch_size))
@@ -145,23 +146,27 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
         if not os.path.exists(os.path.join(results_dir,f'cv{i}',f'it{it}')):
             os.mkdir(os.path.join(results_dir,f'cv{i}',f'it{it}'))
         
-        #train_datagen = ImageDataGenerator(horizontal_flip=True, vertical_flip=True,rotation_range=90)
-        #train_generator = train_datagen.flow(x_lab, y_lab, batch_size=batch_size, shuffle=True)
+        train_datagen = customImageDataGenerator(horizontal_flip=True, vertical_flip=True,rotation_range=90)
+        train_generator = train_datagen.flow(x_lab, y_lab, batch_size=batch_size, shuffle=True)
 
-        #val_datagen = ImageDataGenerator(horizontal_flip=True, vertical_flip=True,rotation_range=90)
-        #val_generator = train_datagen.flow(x_val, y_val, batch_size=batch_size, shuffle=True)
+        val_datagen = customImageDataGenerator(horizontal_flip=True, vertical_flip=True,rotation_range=90)
+        val_generator = train_datagen.flow(x_val, y_val, batch_size=batch_size, shuffle=True)
 
+        STEP_SIZE_TRAIN = np.ceil(float(train_generator.n)/train_generator.batch_size)
+        STEP_SIZE_VAL = np.ceil(float(val_generator.n)/val_generator.batch_size)
         #steps_per_epoch=np.ceil(len(x_lab)/batch_size)
         #model.set_weights(pre-weights)
-        history=model.fit(x_lab,    #nu dus geen re-initialisatie van weights!!
-                          y_lab,
-                          epochs=epochs,
-                          batch_size=batch_size,
-                          validation_data=(x_val,y_val))   
-        #history = model.fit_generator(train_generator, 
-                        #epochs=epochs,
-                        #validation_data=val_generator,
-                        #shuffle=True)
+        #history=model.fit(x_lab,    #nu dus geen re-initialisatie van weights!!
+                          #y_lab,
+                          #epochs=epochs,
+                          #batch_size=batch_size,
+                          #validation_data=(x_val,y_val))   
+        history=model.fit_generator(train_generator, 
+                                    steps_per_epoch=STEP_SIZE_TRAIN,
+                                    epochs=epochs,
+                                    validation_data=val_generator,
+                                    validation_steps=STEP_SIZE_VAL,
+                                    shuffle=True)
         
         y_pred_unlab=model.predict(x_unlab)
         for u in range(len(y_pred_unlab)):
