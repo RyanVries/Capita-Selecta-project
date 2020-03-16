@@ -64,8 +64,8 @@ data_dir = r"TrainingData" #Change to your data directory
 data_dir_test=r"TestData"
 data_dir_unlab=r"UnlabeledData"
 results_dir=r"results"
-exp_name='test1'
-exp='Full'  #'Baseline','Simple','Full'
+exp_name='test_base'
+exp='Baseline'  #'Baseline','Simple','Full'
 
 #Image shape to which the original images will be subsampled. For now, each
 #dimension must be divisible by pool_size^depth (2^4 = 16 by default)
@@ -84,7 +84,7 @@ test_data,test_labels=get_data_array(data_dir_test,new_shape=sample_shape)
 if exp=='Baseline':
     max_it=0
 elif exp=='Simple':
-    max_it=1
+    max_it=2
 elif exp=='Full':
     max_it=10
 conf=0.9  #what is a confident prediction
@@ -94,7 +94,7 @@ depth = 4
 channels = 32
 use_batchnorm = True
 batch_size = 5
-epochs = 100#250
+epochs = 10#250
 input_shape=tuple([1]+sample_shape)
 val_img=1 #number of validation images
 #steps_per_epoch = int(np.ceil((patches_per_im * len(train_images)) / batch_size))
@@ -143,6 +143,29 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
     x_val=data[val_index]
     y_val=labels[val_index]
     
+    if exp=='Baseline':
+        train_datagen = customImageDataGenerator(horizontal_flip=True, vertical_flip=True,rotation_range=90)
+        train_generator = train_datagen.flow(x_lab, y_lab, batch_size=batch_size, shuffle=True)
+
+        val_datagen = customImageDataGenerator(horizontal_flip=True, vertical_flip=True,rotation_range=90)
+        val_generator = val_datagen.flow(x_val, y_val, batch_size=batch_size, shuffle=True)
+
+        STEP_SIZE_TRAIN = np.ceil(float(train_generator.n)/train_generator.batch_size)
+        STEP_SIZE_VAL = np.ceil(float(val_generator.n)/val_generator.batch_size)
+        
+        #history=model.fit(x_lab,    #nu dus geen re-initialisatie van weights!!
+                          #y_lab,
+                          #epochs=epochs,
+                          #batch_size=batch_size,
+                          #validation_data=(x_val,y_val))   
+        history=model.fit_generator(train_generator, 
+                                    steps_per_epoch=STEP_SIZE_TRAIN,
+                                    epochs=epochs,
+                                    validation_data=val_generator,
+                                    validation_steps=STEP_SIZE_VAL,
+                                    shuffle=True)
+
+
 
     it=0
     while len(x_unlab)!=0 and it<max_it:
@@ -155,7 +178,7 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
         train_generator = train_datagen.flow(x_lab, y_lab, batch_size=batch_size, shuffle=True)
 
         val_datagen = customImageDataGenerator(horizontal_flip=True, vertical_flip=True,rotation_range=90)
-        val_generator = train_datagen.flow(x_val, y_val, batch_size=batch_size, shuffle=True)
+        val_generator = val_datagen.flow(x_val, y_val, batch_size=batch_size, shuffle=True)
 
         STEP_SIZE_TRAIN = np.ceil(float(train_generator.n)/train_generator.batch_size)
         STEP_SIZE_VAL = np.ceil(float(val_generator.n)/val_generator.batch_size)
@@ -174,26 +197,33 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
                                     shuffle=True)
         
         y_pred_unlab=model.predict(x_unlab)
-        dels=[]
-        for u in range(len(y_pred_unlab)):
-            y_pred=y_pred_unlab[u]
+        
+        if exp=='Full':
+            dels=[]
+            for u in range(len(y_pred_unlab)):
+                y_pred=y_pred_unlab[u]
+                
+                pros=y_pred[y_pred>=0.5]
+                back=y_pred[y_pred<0.5]
+                
+                #exp simple of full toevoegen
+                if np.sum(pros)!=0 and np.sum(back)!=0:
+                    if (np.sum(pros>conf)/np.size(pros))>min_conf_rat and (np.sum(back<(1-conf))/np.size(back))>min_conf_rat:
+                        x_lab=np.concatenate((x_lab,np.expand_dims(x_unlab[u],axis=1)),axis=0)
+                        y_lab=np.concatenate((y_lab,np.expand_dims(y_pred>=0.5,axis=1)),axis=0)
+                        dels.append(u)
+            x_unlab=np.delete(x_unlab,dels,axis=0)
+        elif exp=='Simple' and it==1:
+            x_lab=np.concatenate((x_lab,x_unlab),axis=0)
+            y_lab=np.concatenate((y_lab,y_pred_unlab>=0.5),axis=0)
             
-            pros=y_pred[y_pred>=0.5]
-            back=y_pred[y_pred<0.5]
-            
-            if np.sum(pros)!=0 and np.sum(back)!=0:
-                if (np.sum(pros>conf)/np.size(pros))>min_conf_rat and (np.sum(back<(1-conf))/np.size(back))>min_conf_rat:
-                    x_lab=np.concatenate((x_lab,np.expand_dims(x_unlab[u],axis=1)),axis=0)
-                    y_lab=np.concatenate((y_lab,np.expand_dims(y_pred>=0.5,axis=1)),axis=0)
-                    dels.append(u)
-        x_unlab=np.delete(x_unlab,dels,axis=0)
         model.save_weights(os.path.join(results_dir,f'cv{i}',f'it{it}','weights.hdf5'))
         
-                
-    if len(x_unlab)!=0:
-        print(f'Self-Training has failed: {len(x_unlab)} unlabeled images remaining'+'\n')
-    else:
-        print(f'Self-Traning has succeeded'+'\n')
+    if exp=='Full':             
+        if len(x_unlab)!=0:
+            print(f'Self-Training has failed: {len(x_unlab)} unlabeled images remaining'+'\n')
+        else:
+            print(f'Self-Training has succeeded'+'\n')
         
     model.save_weights(os.path.join(results_dir,f'cv{i}','end_weights.hdf5'))
         
@@ -204,6 +234,7 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
     models.append(model)
     
     print(f'Time expired for cross-validation step {i+1}: {int(time.time() - begin_time)} sec.')
+
 valco=[f'Validation image {v}' for v in range(val_img)]
 columns=['Cross-Validation step']+valco
 frame=pd.DataFrame(np.column_stack((list(range(1,cv+1))+ ['mean','std'],np.vstack([val_dice,np.mean(val_dice,axis=0),np.std(val_dice,axis=0)]))),columns=columns)
