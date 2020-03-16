@@ -91,10 +91,11 @@ conf=0.9  #what is a confident prediction
 min_conf_rat=0.9  #minimal fraction of confident predictions needed to pass unlabaled image
 cv=len(data)
 depth = 4
-channels = 32
+learning_rate=1e-1
+n_base_filters=32
 use_batchnorm = True
 batch_size = 5
-epochs = 10#250
+epochs = 100#250
 input_shape=tuple([1]+sample_shape)
 val_img=1 #number of validation images
 #steps_per_epoch = int(np.ceil((patches_per_im * len(train_images)) / batch_size))
@@ -133,7 +134,7 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
         os.mkdir(os.path.join(results_dir,f'cv{i}'))
     
     begin_time=time.time()
-    model = unet_model_3d(input_shape=input_shape,initial_learning_rate=1e-1,depth=4,n_base_filters=16,batch_normalization=use_batchnorm)
+    model = unet_model_3d(input_shape=input_shape,initial_learning_rate=learning_rate,depth=depth,n_base_filters=n_base_filters,batch_normalization=use_batchnorm)
 
     print(f'Cross-Validation step {i+1} of {cv}'+'\n')
     
