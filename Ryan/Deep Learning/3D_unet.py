@@ -64,8 +64,8 @@ data_dir = r"TrainingData" #Change to your data directory
 data_dir_test=r"TestData"
 data_dir_unlab=r"UnlabeledData"
 results_dir=r"results"
-exp_name='test_base'
-exp='Baseline'  #'Baseline','Simple','Full'
+exp_name='test_full'
+exp='Full'  #'Baseline','Simple','Full'
 
 #Image shape to which the original images will be subsampled. For now, each
 #dimension must be divisible by pool_size^depth (2^4 = 16 by default)
