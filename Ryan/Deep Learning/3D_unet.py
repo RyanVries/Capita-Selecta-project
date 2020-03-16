@@ -64,8 +64,8 @@ data_dir = r"TrainingData" #Change to your data directory
 data_dir_test=r"TestData"
 data_dir_unlab=r"UnlabeledData"
 results_dir=r"results"
-exp_name='test_full'
-exp='Full'  #'Baseline','Simple','Full'
+exp_name='test3'
+exp='Baseline'  #'Baseline','Simple','Full'
 
 #Image shape to which the original images will be subsampled. For now, each
 #dimension must be divisible by pool_size^depth (2^4 = 16 by default)
@@ -230,7 +230,7 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
         
     y_pred_val=model.predict(x_val)   
     for v in range(val_img):
-        val_dice[i,v]=dice(y_pred_val[v],y_val[v])
+        val_dice[i,v]=dice(y_pred_val[v]>=0.5,y_val[v])
     print(f'Mean Validation Dice overlap of {np.mean(val_dice[i,:])}'+'\n')
     models.append(model)
     
