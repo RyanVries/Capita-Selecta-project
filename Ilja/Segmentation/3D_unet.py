@@ -63,22 +63,27 @@ def get_data_array(data_dir, new_shape, shuffle=False,unlabeled=False):
 def get_pretrain_data(data_dir, new_shape):
     nr_imgs = 50
     
-    old_shape = (86,333,271)
-    factor = (new_shape[0]/old_shape[0],new_shape[1]/old_shape[1],new_shape[2]/old_shape[2])
+    #old_shape = (86,333,271)
     
-    img_dim = (nr_imgs,round(factor[0]*old_shape[0]),round(factor[1]*old_shape[1]),
-               round(factor[2]*old_shape[2]))
+#    img_dim = (nr_imgs,round(factor[0]*old_shape[0]),round(factor[1]*old_shape[1]),
+#               round(factor[2]*old_shape[2]))
+    img_dim = (nr_imgs,new_shape[0],new_shape[1],new_shape[2])
     
     data_array = np.zeros(img_dim)
     label_array = np.zeros(img_dim) 
     
-    for i in range(0,1):
+    for i in range(nr_imgs):
         subj_str = f"{data_dir}/Case{i:02d}"
         mr_img = GetArrayFromImage(ReadImage(subj_str+".mhd"))
+        old_shape = mr_img.shape
+        factor = (new_shape[0]/old_shape[0],new_shape[1]/old_shape[1],new_shape[2]/old_shape[2])
         data_array[i] = zoom(mr_img,zoom=factor,order=1)
         seg = GetArrayFromImage(ReadImage(subj_str+"_segmentation.mhd"))
         label_array[i] = zoom(seg,zoom=factor,order=1)
         
+    data_array = np.expand_dims(data_array,1)
+    label_array = np.expand_dims(label_array,1)   
+    
     return data_array, label_array
         
 
@@ -114,15 +119,15 @@ elif exp=='Full':
     
 conf=0.9  #what is a confident prediction
 min_conf_rat=0.9  #minimal fraction of confident predictions needed to pass unlabaled image
-cv=len(data)
-lr = 0.00001
+cv=5#len(data)
+lr = 0.0001
 depth = 4
 channels = 16
 use_batchnorm = True
-batch_size = 100
+batch_size = 5
 epochs = 100#250
 input_shape=tuple([1]+sample_shape)
-val_img=1 #number of validation images
+val_img=5 #number of validation images
 #steps_per_epoch = int(np.ceil((patches_per_im * len(train_images)) / batch_size))
 
 # stop the training if the validation loss does not increase for 15 consecutive epochs
@@ -146,7 +151,7 @@ elif len(os.listdir(results_dir)) != 0 and exp_name!='test':
         
         
 print('Pre-Processing finished'+'\n'+'Model training starting'+'\n')
-for i,(train_index, val_index) in enumerate(kf.split(data)):
+for i,(train_index, val_index) in enumerate(kf.split(pretrain_data)):
     if not os.path.exists(os.path.join(results_dir,f'cv{i}')):
         os.mkdir(os.path.join(results_dir,f'cv{i}'))
     
@@ -156,10 +161,16 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
     print(f'Cross-Validation step {i+1} of {cv}'+'\n')
     
     x_unlab=data_unlab
-    x_lab=data[train_index]
-    y_lab=labels[train_index]
-    x_val=data[val_index]
-    y_val=labels[val_index]
+#    x_lab=data[train_index]
+#    y_lab=labels[train_index]
+#    x_val=data[val_index]
+#    y_val=labels[val_index]
+    
+    x_lab=pretrain_data[train_index]
+    y_lab=pretrain_labels[train_index]
+    x_val=pretrain_data[val_index]
+    y_val=pretrain_labels[val_index]
+    
 #    x_lab=data[0:4]
 #    y_lab=labels[0:4]
 #    x_val=data[4:5]
