@@ -24,6 +24,7 @@ from keras.optimizers import Adam, SGD
 from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
 #from unet_model3d import unet
 from unet_3D_v2 import unet_model_3d
+from keras import backend as K
 
 #Should turn off training on GPU
 #os.environ["CUDA_VISIBLE_DEVICES"] = '-1'
@@ -59,25 +60,51 @@ def get_data_array(data_dir, new_shape, shuffle=False,unlabeled=False):
         return data_array, label_array
     else:
         return data_array
+    
+def get_pretrain_data(data_dir, new_shape):
+    nr_imgs = 50
+    
+    #old_shape = (86,333,271)
+    
+#    img_dim = (nr_imgs,round(factor[0]*old_shape[0]),round(factor[1]*old_shape[1]),
+#               round(factor[2]*old_shape[2]))
+    img_dim = (nr_imgs,new_shape[0],new_shape[1],new_shape[2])
+    
+    data_array = np.zeros(img_dim)
+    label_array = np.zeros(img_dim) 
+    
+    for i in range(nr_imgs):
+        subj_str = f"{data_dir}/Case{i:02d}"
+        mr_img = GetArrayFromImage(ReadImage(subj_str+".mhd"))
+        old_shape = mr_img.shape
+        factor = (new_shape[0]/old_shape[0],new_shape[1]/old_shape[1],new_shape[2]/old_shape[2])
+        data_array[i] = zoom(mr_img,zoom=factor,order=1)
+        seg = GetArrayFromImage(ReadImage(subj_str+"_segmentation.mhd"))
+        label_array[i] = zoom(seg,zoom=factor,order=1)
+        
+    data_array = np.expand_dims(data_array,1)
+    label_array = np.expand_dims(label_array,1)   
+    
+    return data_array, label_array
 
+#data_dir=r"PretrainingData"
 data_dir = r"TrainingData" #Change to your data directory
 data_dir_test=r"TestData"
 data_dir_unlab=r"UnlabeledData"
 results_dir=r"results"
-exp_name='test3'
+exp_name='pretrain1'
 exp='Baseline'  #'Baseline','Simple','Full'
 
 #Image shape to which the original images will be subsampled. For now, each
 #dimension must be divisible by pool_size^depth (2^4 = 16 by default)
 sample_shape = [16,80,64]
 #sample_shape=[80,320,256]
+
+#data, labels = get_pretrain_data(data_dir,new_shape=sample_shape)
 data, labels = get_data_array(data_dir,new_shape=sample_shape)
 data_unlab=get_data_array(data_dir_unlab,new_shape=sample_shape,unlabeled=True)
 test_data,test_labels=get_data_array(data_dir_test,new_shape=sample_shape)
-#slice_id = 40
-#x_slice = data[1,0,slice_id,:,:]
-#y_slice = labels[1,0,slice_id,:,:]
-#plt.imshow(data,cmap='gray')
+
 
 
 # hyperparameters
@@ -89,15 +116,15 @@ elif exp=='Full':
     max_it=10
 conf=0.9  #what is a confident prediction
 min_conf_rat=0.9  #minimal fraction of confident predictions needed to pass unlabaled image
-cv=len(data)
+cv=5
 depth = 4
-learning_rate=1e-1
-n_base_filters=16
+learning_rate=1e-3
+n_base_filters=32
 use_batchnorm = True
-batch_size = 5
-epochs = 100#250
+batch_size = 3
+epochs = 200#250
 input_shape=tuple([1]+sample_shape)
-val_img=1 #number of validation images
+val_img=int(len(data)/cv) #number of validation images
 #steps_per_epoch = int(np.ceil((patches_per_im * len(train_images)) / batch_size))
 
 # initialize model
@@ -110,6 +137,7 @@ val_img=1 #number of validation images
 
 # stop the training if the validation loss does not increase for 15 consecutive epochs
 #early_stopping = EarlyStopping(monitor='val_loss', patience=15, restore_best_weights=True)
+
 kf = KFold(n_splits=cv) #leave-one-out-approach
 
 
@@ -127,15 +155,17 @@ elif len(os.listdir(results_dir)) != 0:
     if inp != 'y':
         sys.exit()
         
-        
+
 print('Pre-Processing finished'+'\n'+'Model training starting'+'\n')
 for i,(train_index, val_index) in enumerate(kf.split(data)):
     if not os.path.exists(os.path.join(results_dir,f'cv{i}')):
         os.mkdir(os.path.join(results_dir,f'cv{i}'))
     
     begin_time=time.time()
-    model = unet_model_3d(input_shape=input_shape,initial_learning_rate=learning_rate,depth=depth,n_base_filters=n_base_filters,batch_normalization=use_batchnorm)
-
+    
+    with tf.device('/cpu:0'):
+        model = unet_model_3d(input_shape=input_shape,initial_learning_rate=learning_rate,depth=depth,n_base_filters=n_base_filters,batch_normalization=use_batchnorm)
+        model.load_weights('pretrained_weights.hdf5')
     print(f'Cross-Validation step {i+1} of {cv}'+'\n')
     
     x_unlab=data_unlab
@@ -145,7 +175,14 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
     y_val=labels[val_index]
     
     if exp=='Baseline':
-        train_datagen = customImageDataGenerator(horizontal_flip=True, vertical_flip=True,rotation_range=90)
+        train_datagen = customImageDataGenerator(horizontal_flip=True, 
+                                                 vertical_flip=True,
+                                                 rotation_range=90,
+                                                 width_shift_range=0.1,
+                                                 height_shift_range=0.1,
+                                                 zoom_range=0.2,
+                                                 shear_range=0.2,
+                                                 brightness_range=[0.5,1.5])
         train_generator = train_datagen.flow(x_lab, y_lab, batch_size=batch_size, shuffle=True)
 
         val_datagen = customImageDataGenerator(horizontal_flip=True, vertical_flip=True,rotation_range=90)
@@ -164,7 +201,8 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
                                     epochs=epochs,
                                     validation_data=val_generator,
                                     validation_steps=STEP_SIZE_VAL,
-                                    shuffle=True)
+                                    shuffle=True,
+                                    verbose=2)
 
 
 
@@ -184,7 +222,7 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
         STEP_SIZE_TRAIN = np.ceil(float(train_generator.n)/train_generator.batch_size)
         STEP_SIZE_VAL = np.ceil(float(val_generator.n)/val_generator.batch_size)
         #steps_per_epoch=np.ceil(len(x_lab)/batch_size)
-        #model.set_weights(pre-weights)
+        model.load_weights('pretrained_weights.hdf5')
         #history=model.fit(x_lab,    #nu dus geen re-initialisatie van weights!!
                           #y_lab,
                           #epochs=epochs,
@@ -228,12 +266,14 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
         
     model.save_weights(os.path.join(results_dir,f'cv{i}','end_weights.hdf5'))
         
+    
     y_pred_val=model.predict(x_val)   
     for v in range(val_img):
         val_dice[i,v]=dice(y_pred_val[v]>=0.5,y_val[v])
     print(f'Mean Validation Dice overlap of {np.mean(val_dice[i,:])}'+'\n')
     models.append(model)
     
+    K.clear_session()
     print(f'Time expired for cross-validation step {i+1}: {int(time.time() - begin_time)} sec.')
 
 valco=[f'Validation image {v}' for v in range(val_img)]
