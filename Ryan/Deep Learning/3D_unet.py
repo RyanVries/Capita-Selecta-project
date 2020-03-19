@@ -277,8 +277,8 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
     print(f'Time expired for cross-validation step {i+1}: {int(time.time() - begin_time)} sec.')
 
 valco=[f'Validation image {v}' for v in range(val_img)]
-columns=['Cross-Validation step']+valco
-frame=pd.DataFrame(np.column_stack((list(range(1,cv+1))+ ['mean','std'],np.vstack([val_dice,np.mean(val_dice,axis=0),np.std(val_dice,axis=0)]))),columns=columns)
+columns=['Cross-Validation step']+valco+['Mean','Std']
+frame=pd.DataFrame(np.column_stack((list(range(0,cv)),val_dice,np.mean(val_dice,axis=1),np.std(val_dice,axis=1))),columns=columns)
 frame.to_excel(os.path.join(results_dir,'results.xlsx'),index=False)
 print('Process has finished')
         
