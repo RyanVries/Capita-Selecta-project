@@ -183,7 +183,7 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
                                                  brightness_range=[0.8,1.2])
         train_generator = train_datagen.flow(x_lab, y_lab, batch_size=batch_size, shuffle=True)
 
-        val_datagen = customImageDataGenerator(horizontal_flip=True, vertical_flip=True,rotation_range=90)
+        val_datagen = customImageDataGenerator()
         val_generator = val_datagen.flow(x_val, y_val, batch_size=batch_size, shuffle=True)
 
         STEP_SIZE_TRAIN = np.ceil(float(train_generator.n)/train_generator.batch_size)
@@ -220,11 +220,7 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
                                                  brightness_range=[0.8,1.2])
         train_generator = train_datagen.flow(x_lab, y_lab, batch_size=batch_size, shuffle=True)
 
-        val_datagen = customImageDataGenerator(horizontal_flip=True, 
-                                               vertical_flip=True,
-                                               rotation_range=15,
-                                               zoom_range=0.2,
-                                               brightness_range=[0.8,1.2])
+        val_datagen = customImageDataGenerator()
         val_generator = val_datagen.flow(x_val, y_val, batch_size=batch_size, shuffle=True)
 
         STEP_SIZE_TRAIN = np.ceil(float(train_generator.n)/train_generator.batch_size)
@@ -276,8 +272,12 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
             print(f'Self-Training has succeeded'+'\n')
         
     model.save_weights(os.path.join(results_dir,f'cv{i}','end_weights.hdf5'))
-        
     
+    if exp=='Baseline':
+        model.load_weights(os.path.join(results_dir,f'cv{i}','best_weights.hdf5'))
+    elif exp=='Simple' or 'Full':
+        model.load_weights(os.path.join(results_dir,f'cv{i}',f'it{it}','best_weights.hdf5'))
+
     y_pred_val=model.predict(x_val)   
     for v in range(val_img):
         val_dice[i,v]=dice(y_pred_val[v]>=0.5,y_val[v])
