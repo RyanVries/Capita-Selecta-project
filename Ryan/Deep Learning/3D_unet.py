@@ -235,13 +235,16 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
                           #y_lab,
                           #epochs=epochs,
                           #batch_size=batch_size,
-                          #validation_data=(x_val,y_val))   
+                          #validation_data=(x_val,y_val))  
+                          
+        checkpointer = ModelCheckpoint(filepath=os.path.join(results_dir,f'cv{i}',f'it{it}','best_weights.hdf5'), save_weights_only=True, mode='max', monitor='val_dice_coefficient', verbose=2, save_best_only=True)
         history=model.fit_generator(train_generator, 
                                     steps_per_epoch=STEP_SIZE_TRAIN,
                                     epochs=epochs,
                                     validation_data=val_generator,
                                     validation_steps=STEP_SIZE_VAL,
-                                    shuffle=True)
+                                    shuffle=True,
+                                    callbacks = [checkpointer])
         
         y_pred_unlab=model.predict(x_unlab)
         
