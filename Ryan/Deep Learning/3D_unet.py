@@ -91,8 +91,9 @@ def get_pretrain_data(data_dir, new_shape):
 data_dir = r"TrainingData" #Change to your data directory
 data_dir_test=r"TestData"
 data_dir_unlab=r"UnlabeledData"
+pretrained_weights='pretrained_weights_Ryan.hdf5'
 results_dir=r"results"
-exp_name='pretrain1'
+exp_name='test10'
 exp='Baseline'  #'Baseline','Simple','Full'
 
 #Image shape to which the original images will be subsampled. For now, each
@@ -118,11 +119,11 @@ conf=0.9  #what is a confident prediction
 min_conf_rat=0.9  #minimal fraction of confident predictions needed to pass unlabaled image
 cv=5
 depth = 4
-learning_rate=1e-3
+learning_rate=5e-4
 n_base_filters=32
 use_batchnorm = True
 batch_size = 3
-epochs = 200#250
+epochs = 100
 input_shape=tuple([1]+sample_shape)
 val_img=int(len(data)/cv) #number of validation images
 #steps_per_epoch = int(np.ceil((patches_per_im * len(train_images)) / batch_size))
@@ -165,7 +166,7 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
     
     with tf.device('/cpu:0'):
         model = unet_model_3d(input_shape=input_shape,initial_learning_rate=learning_rate,depth=depth,n_base_filters=n_base_filters,batch_normalization=use_batchnorm)
-        model.load_weights('pretrained_weights.hdf5')
+        model.load_weights(pretrained_weights)
     print(f'Cross-Validation step {i+1} of {cv}'+'\n')
     
     x_unlab=data_unlab
@@ -177,12 +178,9 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
     if exp=='Baseline':
         train_datagen = customImageDataGenerator(horizontal_flip=True, 
                                                  vertical_flip=True,
-                                                 rotation_range=90,
-                                                 width_shift_range=0.1,
-                                                 height_shift_range=0.1,
+                                                 rotation_range=15,
                                                  zoom_range=0.2,
-                                                 shear_range=0.2,
-                                                 brightness_range=[0.5,1.5])
+                                                 brightness_range=[0.8,1.2])
         train_generator = train_datagen.flow(x_lab, y_lab, batch_size=batch_size, shuffle=True)
 
         val_datagen = customImageDataGenerator(horizontal_flip=True, vertical_flip=True,rotation_range=90)
@@ -191,6 +189,7 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
         STEP_SIZE_TRAIN = np.ceil(float(train_generator.n)/train_generator.batch_size)
         STEP_SIZE_VAL = np.ceil(float(val_generator.n)/val_generator.batch_size)
         
+        checkpointer = ModelCheckpoint(filepath=os.path.join(results_dir,f'cv{i}','best_weights.hdf5'), save_weights_only=True, mode='max', monitor='val_dice_coefficient', verbose=2, save_best_only=True)
         #history=model.fit(x_lab,    #nu dus geen re-initialisatie van weights!!
                           #y_lab,
                           #epochs=epochs,
@@ -202,7 +201,8 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
                                     validation_data=val_generator,
                                     validation_steps=STEP_SIZE_VAL,
                                     shuffle=True,
-                                    verbose=2)
+                                    verbose=2,
+                                    callbacks = [checkpointer])
 
 
 
@@ -213,16 +213,24 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
         if not os.path.exists(os.path.join(results_dir,f'cv{i}',f'it{it}')):
             os.mkdir(os.path.join(results_dir,f'cv{i}',f'it{it}'))
         
-        train_datagen = customImageDataGenerator(horizontal_flip=True, vertical_flip=True,rotation_range=90)
+        train_datagen = customImageDataGenerator(horizontal_flip=True, 
+                                                 vertical_flip=True,
+                                                 rotation_range=15,
+                                                 zoom_range=0.2,
+                                                 brightness_range=[0.8,1.2])
         train_generator = train_datagen.flow(x_lab, y_lab, batch_size=batch_size, shuffle=True)
 
-        val_datagen = customImageDataGenerator(horizontal_flip=True, vertical_flip=True,rotation_range=90)
+        val_datagen = customImageDataGenerator(horizontal_flip=True, 
+                                               vertical_flip=True,
+                                               rotation_range=15,
+                                               zoom_range=0.2,
+                                               brightness_range=[0.8,1.2])
         val_generator = val_datagen.flow(x_val, y_val, batch_size=batch_size, shuffle=True)
 
         STEP_SIZE_TRAIN = np.ceil(float(train_generator.n)/train_generator.batch_size)
         STEP_SIZE_VAL = np.ceil(float(val_generator.n)/val_generator.batch_size)
         #steps_per_epoch=np.ceil(len(x_lab)/batch_size)
-        model.load_weights('pretrained_weights.hdf5')
+        model.load_weights(pretrained_weights)
         #history=model.fit(x_lab,    #nu dus geen re-initialisatie van weights!!
                           #y_lab,
                           #epochs=epochs,
