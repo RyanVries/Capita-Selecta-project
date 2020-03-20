@@ -177,7 +177,6 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
     
     if exp=='Baseline':
         train_datagen = customImageDataGenerator(horizontal_flip=True, 
-                                                 vertical_flip=True,
                                                  rotation_range=15,
                                                  zoom_range=0.2,
                                                  brightness_range=[0.8,1.2])
@@ -214,7 +213,6 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
             os.mkdir(os.path.join(results_dir,f'cv{i}',f'it{it}'))
         
         train_datagen = customImageDataGenerator(horizontal_flip=True, 
-                                                 vertical_flip=True,
                                                  rotation_range=15,
                                                  zoom_range=0.2,
                                                  brightness_range=[0.8,1.2])
