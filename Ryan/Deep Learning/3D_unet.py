@@ -94,7 +94,7 @@ data_dir_unlab=r"UnlabeledData"
 pretrained_weights='pretrained_weights_Ryan.hdf5'
 results_dir=r"results"
 exp_name='test10'
-exp='Baseline'  #'Baseline','Simple','Full'
+exp='Baseline'  #'Baseline','Simple','Full_pre', 'Full_it'
 
 #Image shape to which the original images will be subsampled. For now, each
 #dimension must be divisible by pool_size^depth (2^4 = 16 by default)
@@ -113,10 +113,10 @@ if exp=='Baseline':
     max_it=0
 elif exp=='Simple':
     max_it=2
-elif exp=='Full':
+elif exp=='Full_pre' or exp=='Full_it':
     max_it=10
 conf=0.9  #what is a confident prediction
-min_conf_rat=0.9  #minimal fraction of confident predictions needed to pass unlabaled image
+min_conf_rat=0.5  #minimal fraction of confident predictions needed to pass unlabaled image
 cv=5
 depth = 4
 learning_rate=5e-4
@@ -177,13 +177,12 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
     
     if exp=='Baseline':
         train_datagen = customImageDataGenerator(horizontal_flip=True, 
-                                                 vertical_flip=True,
                                                  rotation_range=15,
                                                  zoom_range=0.2,
                                                  brightness_range=[0.8,1.2])
         train_generator = train_datagen.flow(x_lab, y_lab, batch_size=batch_size, shuffle=True)
 
-        val_datagen = customImageDataGenerator(horizontal_flip=True, vertical_flip=True,rotation_range=90)
+        val_datagen = customImageDataGenerator()
         val_generator = val_datagen.flow(x_val, y_val, batch_size=batch_size, shuffle=True)
 
         STEP_SIZE_TRAIN = np.ceil(float(train_generator.n)/train_generator.batch_size)
@@ -214,23 +213,19 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
             os.mkdir(os.path.join(results_dir,f'cv{i}',f'it{it}'))
         
         train_datagen = customImageDataGenerator(horizontal_flip=True, 
-                                                 vertical_flip=True,
                                                  rotation_range=15,
                                                  zoom_range=0.2,
                                                  brightness_range=[0.8,1.2])
         train_generator = train_datagen.flow(x_lab, y_lab, batch_size=batch_size, shuffle=True)
 
-        val_datagen = customImageDataGenerator(horizontal_flip=True, 
-                                               vertical_flip=True,
-                                               rotation_range=15,
-                                               zoom_range=0.2,
-                                               brightness_range=[0.8,1.2])
+        val_datagen = customImageDataGenerator()
         val_generator = val_datagen.flow(x_val, y_val, batch_size=batch_size, shuffle=True)
 
         STEP_SIZE_TRAIN = np.ceil(float(train_generator.n)/train_generator.batch_size)
         STEP_SIZE_VAL = np.ceil(float(val_generator.n)/val_generator.batch_size)
         #steps_per_epoch=np.ceil(len(x_lab)/batch_size)
-        model.load_weights(pretrained_weights)
+        if exp=='Full_pre':
+            model.load_weights(pretrained_weights)
         #history=model.fit(x_lab,    #nu dus geen re-initialisatie van weights!!
                           #y_lab,
                           #epochs=epochs,
@@ -248,7 +243,7 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
         
         y_pred_unlab=model.predict(x_unlab)
         
-        if exp=='Full':
+        if exp=='Full_pre' or exp=='Full_it':
             dels=[]
             for u in range(len(y_pred_unlab)):
                 y_pred=y_pred_unlab[u]
@@ -256,7 +251,7 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
                 pros=y_pred[y_pred>=0.5]
                 back=y_pred[y_pred<0.5]
                 
-                #exp simple of full toevoegen
+                
                 if np.sum(pros)!=0 and np.sum(back)!=0:
                     if (np.sum(pros>conf)/np.size(pros))>min_conf_rat and (np.sum(back<(1-conf))/np.size(back))>min_conf_rat:
                         x_lab=np.concatenate((x_lab,np.expand_dims(x_unlab[u],axis=1)),axis=0)
@@ -269,15 +264,19 @@ for i,(train_index, val_index) in enumerate(kf.split(data)):
             
         model.save_weights(os.path.join(results_dir,f'cv{i}',f'it{it}','weights.hdf5'))
         
-    if exp=='Full':             
+    if exp=='Full_pre' or exp=='Full_it':             
         if len(x_unlab)!=0:
             print(f'Self-Training has failed: {len(x_unlab)} unlabeled images remaining'+'\n')
         else:
             print(f'Self-Training has succeeded'+'\n')
         
     model.save_weights(os.path.join(results_dir,f'cv{i}','end_weights.hdf5'))
-        
     
+    if exp=='Baseline':
+        model.load_weights(os.path.join(results_dir,f'cv{i}','best_weights.hdf5'))
+    elif exp=='Simple' or exp=='Full_pre' or exp=='Full_it':
+        model.load_weights(os.path.join(results_dir,f'cv{i}',f'it{it}','best_weights.hdf5'))
+
     y_pred_val=model.predict(x_val)   
     for v in range(val_img):
         val_dice[i,v]=dice(y_pred_val[v]>=0.5,y_val[v])
